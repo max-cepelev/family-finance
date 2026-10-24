@@ -207,7 +207,7 @@ fun EditTransactionScreen(
                         CompactRow(
                             label = "Категория",
                             value = state.categoryName.ifEmpty { "Без категории" },
-                            leading = { CategoryAvatar(state.categoryTop?.name, state.categoryTop?.uid, size = 22.dp) },
+                            leading = { CategoryAvatar(state.categoryTop?.name, state.categoryTop?.uid, size = 22.dp, icon = state.categoryIcon) },
                             onClick = { picker = Picker.CATEGORY },
                             action = if (showNote) null else ("Заметка" to openNote),
                         )
@@ -229,7 +229,9 @@ fun EditTransactionScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         state.frequent.forEach { category ->
-                            ChoiceChip(category.name, selected = category.uid == draft.categoryUid) { viewModel.pickCategory(category.uid) }
+                            ChoiceChip(listOfNotNull(category.icon, category.name).joinToString(" "), selected = category.uid == draft.categoryUid) {
+                                viewModel.pickCategory(category.uid)
+                            }
                         }
                     }
                 }

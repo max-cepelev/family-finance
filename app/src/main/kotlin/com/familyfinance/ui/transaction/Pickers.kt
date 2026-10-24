@@ -100,7 +100,7 @@ fun CategoryPickerDialog(
                                 else expanded = if (isOpen) null else category.uid
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text(category.name) },
+                            headlineContent = { Text(listOfNotNull(category.icon, category.name).joinToString(" ")) },
                             trailingContent = when {
                                 subs.isNotEmpty() -> ({ Icon(if (isOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null) })
                                 category.uid == selected -> ({ Icon(Icons.Filled.Check, null) })
@@ -115,7 +115,7 @@ fun CategoryPickerDialog(
                             }
                         }
                         items(subs, key = { it.uid }) { sub ->
-                            PickerRow(sub.name, sub.uid == selected, indent = true) { onPick(sub.uid) }
+                            PickerRow(listOfNotNull(sub.icon, sub.name).joinToString(" "), sub.uid == selected, indent = true) { onPick(sub.uid) }
                         }
                     }
                 }

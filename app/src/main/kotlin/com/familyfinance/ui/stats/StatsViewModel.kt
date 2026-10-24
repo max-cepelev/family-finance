@@ -122,7 +122,7 @@ class StatsViewModel @Inject constructor(
                     name = when {
                         category == null -> "Без категории"
                         parent != null && category.uid == parent.uid -> "${parent.name} (без подкатегории)"
-                        else -> category.name
+                        else -> listOfNotNull(category.icon, category.name).joinToString(" ")
                     },
                     amount = share.amount,
                     share = if (total > 0) share.amount.toFloat() / total else 0f,

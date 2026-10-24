@@ -18,9 +18,9 @@ fun AccountEntity.toDomain() =
     Account(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId)
 
 fun Category.toEntity() =
-    CategoryEntity(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId)
+    CategoryEntity(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
 fun CategoryEntity.toDomain() =
-    Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId)
+    Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
 
 fun Transaction.toEntity() = TransactionEntity(
     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,

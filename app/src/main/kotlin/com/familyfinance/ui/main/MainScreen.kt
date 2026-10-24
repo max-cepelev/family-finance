@@ -31,7 +31,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.familyfinance.ui.account.AccountEditScreen
+import com.familyfinance.ui.account.AccountEditViewModel
 import com.familyfinance.ui.accounts.AccountsScreen
+import com.familyfinance.ui.categories.CategoriesScreen
+import com.familyfinance.ui.common.SheetHost
 import com.familyfinance.ui.calendar.CalendarScreen
 import com.familyfinance.ui.more.MoreScreen
 import com.familyfinance.ui.stats.StatsScreen
@@ -52,6 +56,11 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 private const val EDIT_ROUTE = "transaction?${EditTransactionViewModel.ARG_UID}={${EditTransactionViewModel.ARG_UID}}"
 
 private const val SYNC_ROUTE = "sync"
+private const val CATEGORIES_ROUTE = "categories"
+private const val ACCOUNT_ROUTE = "account?${AccountEditViewModel.ARG_UID}={${AccountEditViewModel.ARG_UID}}"
+
+private fun accountRoute(uid: String?) =
+    if (uid == null) "account" else "account?${AccountEditViewModel.ARG_UID}=$uid"
 
 private fun editRoute(uid: String?) =
     if (uid == null) "transaction" else "transaction?${EditTransactionViewModel.ARG_UID}=$uid"
@@ -69,72 +78,92 @@ fun MainScreen() {
         restoreState = true
     }
 
-    Scaffold(
-        // Each screen handles the status bar inset itself.
-        contentWindowInsets = WindowInsets(0),
-        containerColor = FinanceColors.Ground,
-        bottomBar = {
-            if (onTab) {
-                Column {
-                    HorizontalDivider(color = FinanceColors.Hairline)
-                    NavigationBar(containerColor = FinanceColors.Card, tonalElevation = 0.dp) {
-                        Tab.entries.forEach { tab ->
-                            val selected = destination?.hierarchy?.any { it.route == tab.route } == true
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = { openTab(tab) },
-                                icon = { Icon(tab.icon, contentDescription = null) },
-                                // Five tabs on a phone leave ~80dp each: keep labels on one line.
-                                label = {
-                                    Text(
-                                        tab.label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = if (selected) FontWeight.Medium else null,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                    )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = FinanceColors.OnPrimarySoft,
-                                    selectedTextColor = FinanceColors.Ink,
-                                    indicatorColor = FinanceColors.PrimarySoft,
-                                    unselectedIconColor = FinanceColors.Muted,
-                                    unselectedTextColor = FinanceColors.Muted,
-                                ),
-                            )
+    SheetHost {
+        Scaffold(
+            // Each screen handles the status bar inset itself.
+            contentWindowInsets = WindowInsets(0),
+            containerColor = FinanceColors.Ground,
+            bottomBar = {
+                if (onTab) {
+                    Column {
+                        HorizontalDivider(color = FinanceColors.Hairline)
+                        NavigationBar(containerColor = FinanceColors.Card, tonalElevation = 0.dp) {
+                            Tab.entries.forEach { tab ->
+                                val selected = destination?.hierarchy?.any { it.route == tab.route } == true
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = { openTab(tab) },
+                                    icon = { Icon(tab.icon, contentDescription = null) },
+                                    // Five tabs on a phone leave ~80dp each: keep labels on one line.
+                                    label = {
+                                        Text(
+                                            tab.label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (selected) FontWeight.Medium else null,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = FinanceColors.OnPrimarySoft,
+                                        selectedTextColor = FinanceColors.Ink,
+                                        indicatorColor = FinanceColors.PrimarySoft,
+                                        unselectedIconColor = FinanceColors.Muted,
+                                        unselectedTextColor = FinanceColors.Muted,
+                                    ),
+                                )
+                            }
                         }
                     }
                 }
-            }
-        },
-    ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = Tab.Transactions.route,
-            modifier = Modifier.padding(padding),
-        ) {
-            composable(Tab.Transactions.route) {
-                TransactionsScreen(
-                    onAdd = { navController.navigate(editRoute(null)) },
-                    onOpen = { uid -> navController.navigate(editRoute(uid)) },
-                )
-            }
-            composable(Tab.Calendar.route) { CalendarScreen(onOpenDay = { openTab(Tab.Transactions) }) }
-            composable(Tab.Stats.route) { StatsScreen() }
-            composable(Tab.Accounts.route) { AccountsScreen() }
-            composable(Tab.More.route) { MoreScreen(onOpenSync = { navController.navigate(SYNC_ROUTE) }) }
-            composable(SYNC_ROUTE) { SyncScreen(onClose = { navController.popBackStack() }) }
-            composable(
-                EDIT_ROUTE,
-                arguments = listOf(
-                    navArgument(EditTransactionViewModel.ARG_UID) {
-                        type = NavType.StringType
-                        nullable = true
-                        defaultValue = null
-                    },
-                ),
+            },
+        ) { padding ->
+            NavHost(
+                navController = navController,
+                startDestination = Tab.Transactions.route,
+                modifier = Modifier.padding(padding),
             ) {
-                EditTransactionScreen(onClose = { navController.popBackStack() })
+                composable(Tab.Transactions.route) {
+                    TransactionsScreen(
+                        onAdd = { navController.navigate(editRoute(null)) },
+                        onOpen = { uid -> navController.navigate(editRoute(uid)) },
+                    )
+                }
+                composable(Tab.Calendar.route) { CalendarScreen(onOpenDay = { openTab(Tab.Transactions) }) }
+                composable(Tab.Stats.route) { StatsScreen() }
+                composable(Tab.Accounts.route) {
+                    AccountsScreen(onOpenAccount = { uid -> navController.navigate(accountRoute(uid)) })
+                }
+                composable(
+                    ACCOUNT_ROUTE,
+                    arguments = listOf(
+                        navArgument(AccountEditViewModel.ARG_UID) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+                ) { AccountEditScreen(onClose = { navController.popBackStack() }) }
+                composable(Tab.More.route) {
+                    MoreScreen(
+                        onOpenSync = { navController.navigate(SYNC_ROUTE) },
+                        onOpenCategories = { navController.navigate(CATEGORIES_ROUTE) },
+                    )
+                }
+                composable(CATEGORIES_ROUTE) { CategoriesScreen(onClose = { navController.popBackStack() }) }
+                composable(SYNC_ROUTE) { SyncScreen(onClose = { navController.popBackStack() }) }
+                composable(
+                    EDIT_ROUTE,
+                    arguments = listOf(
+                        navArgument(EditTransactionViewModel.ARG_UID) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                    ),
+                ) {
+                    EditTransactionScreen(onClose = { navController.popBackStack() })
+                }
             }
         }
     }

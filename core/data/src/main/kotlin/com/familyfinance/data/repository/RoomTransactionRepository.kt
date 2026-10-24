@@ -53,8 +53,6 @@ class RoomTransactionRepository @Inject constructor(
     override suspend fun frequentCategoryUids(type: TransactionType, limit: Int): List<String> =
         dao.frequentCategoryUids(type, limit, window = FREQUENT_WINDOW)
 
-    /** Strictly newer than the stored version even if this device's clock is behind, so last-writer-wins keeps the edit. */
-    private fun nextVersion(previous: Long?): Long = maxOf(System.currentTimeMillis(), (previous ?: 0L) + 1)
 
     private companion object {
         /** Recent operations considered for "frequent categories". */

@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -51,6 +52,7 @@ import com.familyfinance.ui.theme.FinanceColors
 @Composable
 fun MoreScreen(
     onOpenSync: () -> Unit,
+    onOpenCategories: () -> Unit,
     viewModel: ImportViewModel = hiltViewModel(),
     syncViewModel: SyncViewModel = hiltViewModel(),
 ) {
@@ -78,6 +80,19 @@ fun MoreScreen(
                 onOpen = onOpenSync,
                 onPickFolder = { folderPicker.launch(null) },
             )
+            Spacer(Modifier.height(8.dp))
+            SectionTitle("Справочники")
+            WhiteCard(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onOpenCategories).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(Icons.Outlined.Category, contentDescription = null, tint = FinanceColors.Muted)
+                    Text("Категории", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted)
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 "Данные",

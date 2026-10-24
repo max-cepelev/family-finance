@@ -35,6 +35,8 @@ data class TransactionRowUi(
     /** Top-level category: its first letter and color mark the row. Null for transfers. */
     val avatarName: String?,
     val avatarKey: String?,
+    /** Emoji of the operation's category, else of its top-level category. */
+    val avatarIcon: String? = null,
 )
 
 data class DayUi(val date: LocalDate, val totals: Totals, val rows: List<TransactionRowUi>)
@@ -102,6 +104,7 @@ class TransactionsViewModel @Inject constructor(
             }
         }
         val top = names.top(tx.categoryUid)
-        return TransactionRowUi(tx.uid, tx.type, title, subtitle, tx.amount, tx.currencyCode, top?.name, top?.uid)
+        val icon = names.get(tx.categoryUid)?.icon ?: top?.icon
+        return TransactionRowUi(tx.uid, tx.type, title, subtitle, tx.amount, tx.currencyCode, top?.name, top?.uid, icon)
     }
 }

@@ -12,6 +12,9 @@ interface CurrencyDao {
     @Query("SELECT uid, updatedAt, deviceId FROM currencies") suspend fun versions(): List<VersionRow>
     @Query("SELECT * FROM currencies WHERE deleted = 0 ORDER BY isMain DESC, uid")
     fun observeAll(): Flow<List<CurrencyEntity>>
+
+    @Query("SELECT * FROM currencies WHERE uid = :uid") suspend fun get(uid: String): CurrencyEntity?
+    @Upsert suspend fun upsert(item: CurrencyEntity)
 }
 
 @Dao
@@ -20,6 +23,9 @@ interface AccountGroupDao {
     @Query("SELECT uid, updatedAt, deviceId FROM account_groups") suspend fun versions(): List<VersionRow>
     @Query("SELECT * FROM account_groups WHERE deleted = 0 ORDER BY sortOrder")
     fun observeAll(): Flow<List<AccountGroupEntity>>
+
+    @Query("SELECT * FROM account_groups WHERE uid = :uid") suspend fun get(uid: String): AccountGroupEntity?
+    @Upsert suspend fun upsert(item: AccountGroupEntity)
 }
 
 @Dao
@@ -28,6 +34,9 @@ interface AccountDao {
     @Query("SELECT uid, updatedAt, deviceId FROM accounts") suspend fun versions(): List<VersionRow>
     @Query("SELECT * FROM accounts WHERE deleted = 0 ORDER BY sortOrder")
     fun observeAll(): Flow<List<AccountEntity>>
+
+    @Query("SELECT * FROM accounts WHERE uid = :uid") suspend fun get(uid: String): AccountEntity?
+    @Upsert suspend fun upsert(item: AccountEntity)
 }
 
 @Dao
@@ -36,6 +45,12 @@ interface CategoryDao {
     @Query("SELECT uid, updatedAt, deviceId FROM categories") suspend fun versions(): List<VersionRow>
     @Query("SELECT * FROM categories WHERE deleted = 0 ORDER BY type, sortOrder")
     fun observeAll(): Flow<List<CategoryEntity>>
+
+    @Query("SELECT * FROM categories WHERE uid = :uid") suspend fun get(uid: String): CategoryEntity?
+    @Upsert suspend fun upsert(item: CategoryEntity)
+
+    @Query("SELECT COUNT(*) FROM categories WHERE deleted = 0 AND parentUid = :uid")
+    suspend fun childCount(uid: String): Int
 }
 
 @Dao
@@ -53,6 +68,18 @@ interface TransactionDao {
     /** When [deviceId] last changed an operation; null if never. */
     @Query("SELECT MAX(updatedAt) FROM transactions WHERE deviceId = :deviceId")
     fun observeLastChangeBy(deviceId: String): Flow<Long?>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE deleted = 0 AND (accountUid = :uid OR toAccountUid = :uid)")
+    suspend fun countForAccount(uid: String): Int
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE deleted = 0 AND categoryUid = :uid")
+    suspend fun countForCategory(uid: String): Int
+
+    @Query("SELECT * FROM transactions WHERE deleted = 0 AND categoryUid = :uid")
+    suspend fun withCategory(uid: String): List<TransactionEntity>
+
+    @Query("SELECT categoryUid, COUNT(*) AS count FROM transactions WHERE deleted = 0 AND categoryUid IS NOT NULL GROUP BY categoryUid")
+    fun observeCategoryUsage(): Flow<List<UsageRow>>
 
     @Query("SELECT MIN(date) FROM transactions WHERE deleted = 0")
     suspend fun firstDate(): Long?

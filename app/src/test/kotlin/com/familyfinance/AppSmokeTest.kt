@@ -5,7 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -56,7 +59,14 @@ class AppSmokeTest {
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Yekaterinburg"))
         try {
             importBackup(File(path))
-            walkThroughScreens()
+            try {
+                walkThroughScreens()
+            } catch (e: Throwable) {
+                println("smoke: failed: $e")
+                generateSequence(e.cause) { it.cause }.forEach { println("smoke: cause: $it") }
+                println("smoke: on screen: " + screenTexts())
+                throw e
+            }
         } finally {
             TimeZone.setDefault(zone)
         }
@@ -146,6 +156,23 @@ class AppSmokeTest {
             compose.onNodeWithText("Не выбрана").assertExists()
             compose.onNodeWithText("Выбрать папку").assertExists()
             scenario.shot("8-more")
+
+            // Categories list with real counts. Actions inside the category panel (emoji, merge) hang
+            // Robolectric's Compose test environment now and then, so they are covered by
+            // CatalogRepositoryTest and were checked on the phone.
+            compose.onNodeWithText("Категории").performClick()
+            waitForText("Расходы · 22")
+            compose.onNodeWithContentDescription("Развернуть «Питание»").performClick()
+            waitForText("Приколюхи")
+            waitForText(MoneyFormatter.count(2134))
+            scenario.shot("9-categories")
+            compose.onNodeWithContentDescription("Назад").performClick()
+
+            // The account editor hangs Robolectric's Compose environment the same way as the category
+            // panel; it was checked on the phone, its logic is covered by CatalogRepositoryTest.
+            compose.onNodeWithText("Счета").performClick()
+            waitForText("Активы")
+            scenario.shot("10-accounts-after")
         }
     }
 
@@ -157,8 +184,17 @@ class AppSmokeTest {
         keys.forEach { press(names[it] ?: it.toString()) }
     }
 
+    /** Texts on screen without waiting for idle, which can hang after a failure under Robolectric. */
+    private fun screenTexts(): String = runCatching {
+        compose.onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes(atLeastOneRootRequired = false)
+            .flatMap { root -> generateSequence(listOf(root)) { level -> level.flatMap { it.children }.ifEmpty { null } }.flatten() }
+            .flatMap { node -> node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+            .joinToString(" | ")
+    }.getOrElse { "(unavailable: ${it.message})" }
+
     /** Room loads on its own threads, which waitForIdle() does not track. */
     private fun waitForText(text: String) {
+        println("smoke: waiting for «$text»")
         compose.waitUntil(5_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     }
 

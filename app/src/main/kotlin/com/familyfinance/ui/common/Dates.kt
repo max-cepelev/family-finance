@@ -71,7 +71,7 @@ object Dates {
             count % 10 in 2..4 -> few
             else -> many
         }
-        return "$count $word"
+        return "${java.text.NumberFormat.getIntegerInstance(locale).format(count)} $word"
     }
 
     fun operations(count: Int): String = plural(count, "операция", "операции", "операций")

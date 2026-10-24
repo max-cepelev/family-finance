@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,12 +46,17 @@ import com.familyfinance.ui.theme.FinanceColors
 import kotlin.math.abs
 
 @Composable
-fun AccountsScreen(viewModel: AccountsViewModel = hiltViewModel()) {
+fun AccountsScreen(
+    onOpenAccount: (uid: String?) -> Unit,
+    viewModel: AccountsViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var collapsed by rememberSaveable { mutableStateOf(setOf<String>()) }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenTitle("Счета")
+        ScreenTitle("Счета") {
+            IconButton(onClick = { onOpenAccount(null) }) { Icon(Icons.Filled.Add, contentDescription = "Добавить счёт") }
+        }
         if (!state.loading && state.groups.isEmpty()) {
             Text(
                 "Счетов пока нет. Импортируйте бэкап Money Manager во вкладке «Ещё».",
@@ -88,7 +95,8 @@ fun AccountsScreen(viewModel: AccountsViewModel = hiltViewModel()) {
                         HorizontalDivider(color = FinanceColors.Hairline)
                         group.accounts.forEach { item ->
                             Row(
-                                Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 6.dp)
+                                Modifier.fillMaxWidth().clickable { onOpenAccount(item.account.uid) }
+                                    .heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 6.dp)
                                     .alpha(if (item.account.hidden) 0.55f else 1f),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {

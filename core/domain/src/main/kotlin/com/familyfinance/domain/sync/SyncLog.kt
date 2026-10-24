@@ -87,6 +87,7 @@ sealed interface LogEntry {
     data class CategoryRecord(
         val uid: String, val parentUid: String? = null, val name: String, val type: CategoryType,
         val sortOrder: Int, val archived: Boolean, val updatedAt: Long, val deleted: Boolean, val deviceId: String,
+        val icon: String? = null,
     ) : LogEntry
 
     @Serializable
@@ -104,7 +105,7 @@ sealed interface LogEntry {
         is CurrencyRecord -> Currency(uid, name, symbol, decimals, isMain, rateToMain, updatedAt, deleted, deviceId)
         is GroupRecord -> AccountGroup(uid, name, sortOrder, archived, updatedAt, deleted, deviceId)
         is AccountRecord -> Account(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId)
-        is CategoryRecord -> Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId)
+        is CategoryRecord -> Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
         is TransactionRecord -> Transaction(
             uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
             categoryUid, note, updatedAt, deleted, deviceId,
@@ -116,7 +117,7 @@ sealed interface LogEntry {
             is Currency -> with(record) { CurrencyRecord(uid, name, symbol, decimals, isMain, rateToMain, updatedAt, deleted, deviceId) }
             is AccountGroup -> with(record) { GroupRecord(uid, name, sortOrder, archived, updatedAt, deleted, deviceId) }
             is Account -> with(record) { AccountRecord(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId) }
-            is Category -> with(record) { CategoryRecord(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId) }
+            is Category -> with(record) { CategoryRecord(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon) }
             is Transaction -> with(record) {
                 TransactionRecord(
                     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,

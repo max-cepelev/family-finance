@@ -14,4 +14,6 @@ data class Category(
     override val updatedAt: Long,
     override val deleted: Boolean = false,
     override val deviceId: String,
+    /** Emoji shown instead of the first letter; null for none. */
+    val icon: String? = null,
 ) : Syncable

@@ -21,6 +21,13 @@ object MoneyFormatter {
         NumberFormat.getIntegerInstance(locale)
             .format(Money.toDecimal(minor, decimals).setScale(0, RoundingMode.HALF_UP))
 
+    /** Plain editable number with kopecks only when present: 17835774 -> "178357,74", 100000 -> "1000". */
+    fun compactExact(minor: Long, decimals: Int = 2): String =
+        Money.toDecimal(minor, decimals).stripTrailingZeros().toPlainString().replace('.', ',')
+
+    /** 2134 -> "2 134". */
+    fun count(value: Int): String = NumberFormat.getIntegerInstance(locale).format(value)
+
     fun symbol(code: String): String =
         runCatching { java.util.Currency.getInstance(code).getSymbol(locale) }.getOrDefault(code)
 }

@@ -45,6 +45,8 @@ data class EditTransactionUiState(
     val categoryName: String = "",
     /** Top-level category, for the avatar next to the category field. */
     val categoryTop: Category? = null,
+    /** Emoji of the chosen category, else of its top-level one. */
+    val categoryIcon: String? = null,
     val currency: String = "",
     val toCurrency: String = "",
     val needsToAmount: Boolean = false,
@@ -101,6 +103,7 @@ class EditTransactionViewModel @Inject constructor(
                 toAccountName = byUid[d.toAccountUid]?.account?.name.orEmpty(),
                 categoryName = names.label(d.categoryUid).orEmpty(),
                 categoryTop = names.top(d.categoryUid),
+                categoryIcon = names.get(d.categoryUid)?.icon ?: names.top(d.categoryUid)?.icon,
                 currency = d.currency(accountsByUid).orEmpty(),
                 toCurrency = byUid[d.toAccountUid]?.account?.currencyCode.orEmpty(),
                 needsToAmount = d.needsToAmount(accountsByUid),

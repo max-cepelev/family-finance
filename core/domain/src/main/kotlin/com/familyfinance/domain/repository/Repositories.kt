@@ -16,6 +16,17 @@ interface AccountRepository {
     fun observeAccounts(): Flow<List<Account>>
     fun observeAccountsWithBalance(): Flow<List<AccountWithBalance>>
     fun observeCurrencies(): Flow<List<Currency>>
+
+    // Writes stamp updatedAt/deviceId themselves and queue the change for sync.
+    suspend fun saveAccount(account: Account)
+    suspend fun saveGroup(group: AccountGroup)
+    suspend fun saveCurrency(currency: Currency)
+
+    /** Operations on the account, either side of a transfer included. */
+    suspend fun countTransactions(accountUid: String): Int
+
+    /** Deletes an account without operations; false (and nothing changed) when it has some. */
+    suspend fun deleteAccount(uid: String): Boolean
 }
 
 interface TransactionRepository {
@@ -48,6 +59,21 @@ interface TransactionRepository {
 interface CategoryRepository {
     /** Including archived categories: old transactions still show them. */
     fun observeAll(): Flow<List<Category>>
+
+    /** Category uid -> number of operations booked on it (subcategories counted separately). */
+    fun observeUsage(): Flow<Map<String, Int>>
+
+    /** Stamps updatedAt/deviceId and queues the change for sync. */
+    suspend fun save(category: Category)
+
+    /** Deletes a category without operations and subcategories; false when it is not empty. */
+    suspend fun delete(uid: String): Boolean
+
+    /**
+     * Moves every operation of [fromUid] to [toUid] and hides [fromUid]; returns how many moved.
+     * Only for a category without subcategories.
+     */
+    suspend fun merge(fromUid: String, toUid: String): Int
 }
 
 /** Writes an imported snapshot into local storage, merging by last-writer-wins. */

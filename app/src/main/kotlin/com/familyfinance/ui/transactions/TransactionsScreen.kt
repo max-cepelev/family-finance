@@ -155,7 +155,7 @@ private fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
                 Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
             }
         } else {
-            CategoryAvatar(row.avatarName, row.avatarKey)
+            CategoryAvatar(row.avatarName, row.avatarKey, icon = row.avatarIcon)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(row.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -226,20 +226,24 @@ object CategoryPalette {
     fun rank(index: Int): Color = ranked.getOrElse(index) { Rest }
 }
 
-/** Round avatar with the first letter of the (top-level) category. */
+/** Round avatar: the category's emoji, or the first letter of its name on the category's tint. */
 @Composable
-fun CategoryAvatar(name: String?, colorKey: String?, size: Dp = 36.dp) {
+fun CategoryAvatar(name: String?, colorKey: String?, size: Dp = 36.dp, icon: String? = null) {
     val (tint, ink) = CategoryPalette.of(colorKey)
     Box(
         Modifier.size(size).clip(CircleShape).background(tint),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            name?.firstOrNull()?.uppercase() ?: "•",
-            color = ink,
-            fontWeight = FontWeight.Medium,
-            fontSize = (size.value * 0.42f).sp,
-        )
+        if (icon != null) {
+            Text(icon, fontSize = (size.value * 0.55f).sp)
+        } else {
+            Text(
+                name?.firstOrNull()?.uppercase() ?: "•",
+                color = ink,
+                fontWeight = FontWeight.Medium,
+                fontSize = (size.value * 0.42f).sp,
+            )
+        }
     }
 }
 

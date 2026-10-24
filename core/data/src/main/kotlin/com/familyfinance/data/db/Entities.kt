@@ -58,6 +58,8 @@ data class CategoryEntity(
     val updatedAt: Long,
     val deleted: Boolean,
     val deviceId: String,
+    /** Emoji; added in schema version 3. */
+    val icon: String? = null,
 )
 
 @Entity(
@@ -110,6 +112,11 @@ data class VersionRow(
     @ColumnInfo(name = "uid") val uid: String,
     @ColumnInfo(name = "updatedAt") val updatedAt: Long,
     @ColumnInfo(name = "deviceId") val deviceId: String,
+)
+
+data class UsageRow(
+    @ColumnInfo(name = "categoryUid") val categoryUid: String,
+    @ColumnInfo(name = "count") val count: Int,
 )
 
 data class BalanceRow(

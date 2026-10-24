@@ -1,17 +1,14 @@
 package com.familyfinance.ui.stats
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.Button
@@ -20,9 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +29,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.familyfinance.ui.common.BottomSheet
 import com.familyfinance.ui.common.ChoiceChip
 import com.familyfinance.ui.common.ColoredAmount
 import com.familyfinance.ui.common.DateDialog
@@ -45,7 +41,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /** "Свой период": quick presets, the two days, a preview of the totals, then "Показать". */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CustomPeriodSheet(
     draft: CustomPeriodDraft,
@@ -59,19 +54,17 @@ fun CustomPeriodSheet(
     var picking by remember { mutableStateOf<Boolean?>(null) } // true: "С", false: "По"
     val period = draft.period
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = FinanceColors.Ground,
-    ) {
-        Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+    BottomSheet(onDismiss = onDismiss) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Свой период", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 4.dp))
 
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                CustomPreset.entries.forEach { preset -> ChoiceChip(preset.label, selected = false) { onPreset(preset) } }
+            // Two per row instead of a FlowRow: see CategorySheet.
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                CustomPreset.entries.chunked(2).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { preset -> ChoiceChip(preset.label, selected = false) { onPreset(preset) } }
+                    }
+                }
             }
 
             WhiteCard(Modifier.fillMaxWidth()) {

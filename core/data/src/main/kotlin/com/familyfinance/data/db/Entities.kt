@@ -81,6 +81,37 @@ data class TransactionEntity(
     val updatedAt: Long,
     val deleted: Boolean,
     val deviceId: String,
+    /** "push" for operations from bank notifications; added in schema version 4. */
+    val source: String? = null,
+)
+
+/** A card of a bank linked to an account; last4 null is the bank's fallback. Synced like other records. */
+@Entity(tableName = "bank_cards")
+data class BankCardEntity(
+    @PrimaryKey val uid: String,
+    val bank: String,
+    val last4: String?,
+    val accountUid: String,
+    val updatedAt: Long,
+    val deleted: Boolean,
+    val deviceId: String,
+)
+
+/** Notifications already turned into operations, so a re-posted one is not added twice. Local only. */
+@Entity(tableName = "push_seen")
+data class PushSeenEntity(
+    @PrimaryKey val key: String,
+    val seenAt: Long,
+)
+
+/** A card seen in a notification but not linked yet; feeds the "Привязать" hint. Local only. */
+@Entity(tableName = "push_unknown_cards", primaryKeys = ["bank", "last4"])
+data class UnknownCardEntity(
+    val bank: String,
+    val last4: String,
+    val lastSeenAt: Long,
+    /** Account the operation went to through the bank fallback; null when it could not be recorded. */
+    val recordedAccountUid: String?,
 )
 
 /** Local change waiting to be appended to this device's sync log (the outbox). */

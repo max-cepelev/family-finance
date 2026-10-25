@@ -83,6 +83,7 @@ import com.familyfinance.ui.common.MoneyFormatter
 import com.familyfinance.ui.common.SegmentedToggle
 import com.familyfinance.ui.common.TabularNumbers
 import com.familyfinance.ui.common.WhiteCard
+import com.familyfinance.ui.common.rememberFieldText
 import com.familyfinance.ui.common.typeColor
 import com.familyfinance.ui.theme.FinanceColors
 import java.time.Instant
@@ -216,6 +217,7 @@ fun EditTransactionScreen(
                         HorizontalDivider(color = FinanceColors.Hairline)
                         NoteRow(
                             note = draft.note,
+                            resetKey = state.savedTick,
                             onChange = viewModel::setNote,
                             modifier = Modifier.focusRequester(noteFocus).onFocusChanged { if (it.isFocused) keypad = null },
                         )
@@ -424,7 +426,8 @@ private fun CompactRow(
 }
 
 @Composable
-private fun NoteRow(note: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun NoteRow(note: String, resetKey: Any?, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    var text by rememberFieldText(resetKey, note)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -432,13 +435,13 @@ private fun NoteRow(note: String, onChange: (String) -> Unit, modifier: Modifier
     ) {
         Icon(Icons.Outlined.Edit, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
         BasicTextField(
-            value = note,
-            onValueChange = onChange,
+            value = text,
+            onValueChange = { text = it; onChange(it) },
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = FinanceColors.Ink),
             cursorBrush = SolidColor(FinanceColors.Primary),
             decorationBox = { inner ->
                 Box {
-                    if (note.isEmpty()) Text("Заметка", style = MaterialTheme.typography.bodyLarge, color = FinanceColors.Muted)
+                    if (text.isEmpty()) Text("Заметка", style = MaterialTheme.typography.bodyLarge, color = FinanceColors.Muted)
                     inner()
                 }
             },

@@ -8,6 +8,7 @@ import com.familyfinance.data.db.toDomain
 import com.familyfinance.data.db.toEntity
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.AccountGroup
+import com.familyfinance.domain.model.BankCard
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.Currency
 import com.familyfinance.domain.model.Syncable
@@ -52,6 +53,7 @@ class RoomSyncStore @Inject constructor(private val db: FinanceDatabase) : SyncS
         dao.enqueueAllAccounts()
         dao.enqueueAllCategories()
         dao.enqueueAllTransactions()
+        dao.enqueueAllCards()
     }
 
     override suspend fun readOffset(fileName: String): Long = dao.offset(fileName) ?: 0L
@@ -72,6 +74,9 @@ class RoomSyncStore @Inject constructor(private val db: FinanceDatabase) : SyncS
         }
         applied += apply(batch.records.filterIsInstance<Transaction>(), RecordKind.TRANSACTION) { list ->
             db.transactionDao().upsert(list.map { it.toEntity() })
+        }
+        applied += apply(batch.records.filterIsInstance<BankCard>(), RecordKind.CARD) { list ->
+            db.bankDao().upsertCards(list.map { it.toEntity() })
         }
         dao.setOffset(SyncOffsetEntity(batch.fileName, batch.newOffset))
 
@@ -107,6 +112,7 @@ class RoomSyncStore @Inject constructor(private val db: FinanceDatabase) : SyncS
                 RecordKind.ACCOUNT -> dao.accounts(chunk).map { it.toDomain() }
                 RecordKind.CATEGORY -> dao.categories(chunk).map { it.toDomain() }
                 RecordKind.TRANSACTION -> dao.transactions(chunk).map { it.toDomain() }
+                RecordKind.CARD -> db.bankDao().cardsByUid(chunk).map { it.toDomain() }
                 else -> emptyList()
             }
         }

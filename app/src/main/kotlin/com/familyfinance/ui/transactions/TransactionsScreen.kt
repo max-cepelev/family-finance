@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -32,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -84,6 +87,9 @@ fun TransactionsScreen(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (state.toReview.isNotEmpty()) {
+                        item(key = "review") { ReviewBanner(state.toReview.size) { onOpen(state.toReview.first()) } }
+                    }
                     item(key = "summary") { MonthSummary(state.totals, state.mainCurrency) }
                     items(state.days, key = { "d:" + it.date }) { day -> DayCard(day, state.mainCurrency, onOpen) }
                 }
@@ -150,17 +156,57 @@ private fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (row.type == TransactionType.TRANSFER) {
-            Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
+        // A small bell on the avatar marks operations the app added from a bank notification.
+        Box {
+            if (row.type == TransactionType.TRANSFER) {
+                Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
+                }
+            } else if (row.needsCategory) {
+                Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
+                    Text("?", color = FinanceColors.Muted, fontWeight = FontWeight.Medium)
+                }
+            } else {
+                CategoryAvatar(row.avatarName, row.avatarKey, icon = row.avatarIcon)
             }
-        } else {
-            CategoryAvatar(row.avatarName, row.avatarKey, icon = row.avatarIcon)
+            if (row.fromPush) {
+                Box(
+                    Modifier.align(Alignment.BottomEnd).offset(x = 3.dp, y = 3.dp).size(18.dp).clip(CircleShape).background(FinanceColors.Card),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.NotificationsNone, contentDescription = "Из уведомления", tint = FinanceColors.Primary, modifier = Modifier.size(13.dp))
+                }
+            }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(row.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(row.subtitle, style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                row.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (row.needsCategory) FinanceColors.Weekend else FinanceColors.Muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         TypedAmount(row.amount, row.currencyCode, row.type)
+    }
+}
+
+@Composable
+private fun ReviewBanner(count: Int, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFFBF1DC))
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(Icons.Outlined.NotificationsNone, contentDescription = null, tint = Color(0xFF6A4A0C))
+        Text(
+            Dates.plural(count, "операция", "операции", "операций") + " из уведомлений без категории",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF6A4A0C),
+            modifier = Modifier.weight(1f),
+        )
+        Text("Разобрать", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = Color(0xFF6A4A0C))
     }
 }

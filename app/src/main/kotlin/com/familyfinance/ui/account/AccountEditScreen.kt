@@ -60,6 +60,7 @@ import com.familyfinance.ui.common.Dates
 import com.familyfinance.ui.common.MoneyFormatter
 import com.familyfinance.ui.common.TextInputDialog
 import com.familyfinance.ui.common.WhiteCard
+import com.familyfinance.ui.common.rememberFieldText
 import com.familyfinance.ui.theme.FinanceColors
 
 private enum class AccountDialog { GROUP, NEW_GROUP, CURRENCY, BALANCE, DELETE }
@@ -213,18 +214,19 @@ private fun TextRow(
     keyboard: KeyboardType = KeyboardType.Text,
     placeholder: String? = null,
 ) {
+    var text by rememberFieldText(label, value)
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = if (isError) FinanceColors.Expense else FinanceColors.Muted)
         BasicTextField(
-            value = value,
-            onValueChange = onChange,
+            value = text,
+            onValueChange = { text = it; onChange(it) },
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = FinanceColors.Ink),
             cursorBrush = SolidColor(FinanceColors.Primary),
             keyboardOptions = KeyboardOptions(keyboardType = keyboard),
             decorationBox = { inner ->
                 Box {
-                    if (value.isEmpty() && placeholder != null) Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = FinanceColors.ChipBorder)
+                    if (text.isEmpty() && placeholder != null) Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = FinanceColors.ChipBorder)
                     inner()
                 }
             },

@@ -34,6 +34,7 @@ import androidx.navigation.navArgument
 import com.familyfinance.ui.account.AccountEditScreen
 import com.familyfinance.ui.account.AccountEditViewModel
 import com.familyfinance.ui.accounts.AccountsScreen
+import com.familyfinance.ui.banks.BanksScreen
 import com.familyfinance.ui.categories.CategoriesScreen
 import com.familyfinance.ui.common.SheetHost
 import com.familyfinance.ui.calendar.CalendarScreen
@@ -57,6 +58,7 @@ private const val EDIT_ROUTE = "transaction?${EditTransactionViewModel.ARG_UID}=
 
 private const val SYNC_ROUTE = "sync"
 private const val CATEGORIES_ROUTE = "categories"
+private const val BANKS_ROUTE = "banks"
 private const val ACCOUNT_ROUTE = "account?${AccountEditViewModel.ARG_UID}={${AccountEditViewModel.ARG_UID}}"
 
 private fun accountRoute(uid: String?) =
@@ -148,9 +150,11 @@ fun MainScreen() {
                     MoreScreen(
                         onOpenSync = { navController.navigate(SYNC_ROUTE) },
                         onOpenCategories = { navController.navigate(CATEGORIES_ROUTE) },
+                        onOpenBanks = { navController.navigate(BANKS_ROUTE) },
                     )
                 }
                 composable(CATEGORIES_ROUTE) { CategoriesScreen(onClose = { navController.popBackStack() }) }
+                composable(BANKS_ROUTE) { BanksScreen(onClose = { navController.popBackStack() }) }
                 composable(SYNC_ROUTE) { SyncScreen(onClose = { navController.popBackStack() }) }
                 composable(
                     EDIT_ROUTE,

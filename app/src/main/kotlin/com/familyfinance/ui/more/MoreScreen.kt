@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -53,6 +54,7 @@ import com.familyfinance.ui.theme.FinanceColors
 fun MoreScreen(
     onOpenSync: () -> Unit,
     onOpenCategories: () -> Unit,
+    onOpenBanks: () -> Unit,
     viewModel: ImportViewModel = hiltViewModel(),
     syncViewModel: SyncViewModel = hiltViewModel(),
 ) {
@@ -80,6 +82,22 @@ fun MoreScreen(
                 onOpen = onOpenSync,
                 onPickFolder = { folderPicker.launch(null) },
             )
+            Spacer(Modifier.height(8.dp))
+            SectionTitle("Уведомления банков")
+            WhiteCard(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onOpenBanks).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(Icons.Outlined.NotificationsNone, contentDescription = null, tint = FinanceColors.Muted)
+                    Column(Modifier.weight(1f)) {
+                        Text("Операции из пушей", style = MaterialTheme.typography.bodyLarge)
+                        Text("Сбер, Т-Банк, Райффайзен: карты и счета", style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted)
+                }
+            }
             Spacer(Modifier.height(8.dp))
             SectionTitle("Справочники")
             WhiteCard(Modifier.fillMaxWidth()) {

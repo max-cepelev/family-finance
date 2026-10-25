@@ -81,6 +81,18 @@ interface TransactionDao {
     @Query("SELECT categoryUid, COUNT(*) AS count FROM transactions WHERE deleted = 0 AND categoryUid IS NOT NULL GROUP BY categoryUid")
     fun observeCategoryUsage(): Flow<List<UsageRow>>
 
+    @Query(
+        "SELECT uid FROM transactions WHERE deleted = 0 AND source = 'push' AND categoryUid IS NULL " +
+            "AND type != 'TRANSFER' ORDER BY date DESC",
+    )
+    fun observeUncategorizedFromPush(): Flow<List<String>>
+
+    @Query(
+        "SELECT categoryUid FROM transactions WHERE deleted = 0 AND type = :type AND categoryUid IS NOT NULL " +
+            "AND note = :note COLLATE NOCASE ORDER BY date DESC LIMIT 1",
+    )
+    suspend fun categoryForNote(type: TransactionType, note: String): String?
+
     @Query("SELECT MIN(date) FROM transactions WHERE deleted = 0")
     suspend fun firstDate(): Long?
 

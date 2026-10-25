@@ -51,6 +51,7 @@ import com.familyfinance.ui.common.ChoiceDialog
 import com.familyfinance.ui.common.Dates
 import com.familyfinance.ui.common.TextInputDialog
 import com.familyfinance.ui.common.WhiteCard
+import com.familyfinance.ui.common.rememberFieldText
 import com.familyfinance.ui.theme.FinanceColors
 import java.text.BreakIterator
 
@@ -82,6 +83,7 @@ fun CategorySheet(
     onDismiss: () -> Unit,
 ) {
     var dialog by remember { mutableStateOf<SheetDialog?>(null) }
+    var name by rememberFieldText(edit.uid, edit.name)
     val byUid = all.associateBy { it.uid }
     fun label(c: Category?): String {
         if (c == null) return ""
@@ -130,8 +132,8 @@ fun CategorySheet(
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Название", style = MaterialTheme.typography.bodySmall, color = if (edit.nameError) FinanceColors.Expense else FinanceColors.Muted)
                     BasicTextField(
-                        value = edit.name,
-                        onValueChange = onName,
+                        value = name,
+                        onValueChange = { name = it; onName(it) },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = FinanceColors.Ink),
                         cursorBrush = SolidColor(FinanceColors.Primary),

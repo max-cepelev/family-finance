@@ -5,6 +5,7 @@ import com.familyfinance.domain.importer.ImportResult
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.AccountWithBalance
+import com.familyfinance.domain.model.BankCard
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.Currency
 import com.familyfinance.domain.model.Transaction
@@ -52,6 +53,12 @@ interface TransactionRepository {
     /** Account of the newest transaction, a sensible default for a new one. */
     suspend fun lastUsedAccountUid(): String?
 
+    /** Operations added from notifications that still have no category, newest first. */
+    fun observeUncategorizedFromPush(): Flow<List<String>>
+
+    /** Category of the newest operation of [type] with this exact note (payee), ignoring case. */
+    suspend fun categoryForNote(type: TransactionType, note: String): String?
+
     /** Categories used most often recently for [type], most frequent first. */
     suspend fun frequentCategoryUids(type: TransactionType, limit: Int): List<String>
 }
@@ -74,6 +81,14 @@ interface CategoryRepository {
      * Only for a category without subcategories.
      */
     suspend fun merge(fromUid: String, toUid: String): Int
+}
+
+interface BankCardRepository {
+    fun observeAll(): Flow<List<BankCard>>
+    /** Stamps updatedAt/deviceId and queues the change for sync. */
+    suspend fun save(card: BankCard)
+    /** Soft delete, so the other phone drops the link too. */
+    suspend fun delete(uid: String)
 }
 
 /** Writes an imported snapshot into local storage, merging by last-writer-wins. */

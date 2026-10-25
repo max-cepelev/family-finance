@@ -37,6 +37,10 @@ data class TransactionRowUi(
     val avatarKey: String?,
     /** Emoji of the operation's category, else of its top-level category. */
     val avatarIcon: String? = null,
+    /** Added from a bank notification. */
+    val fromPush: Boolean = false,
+    /** From a notification and still without a category: shown for review. */
+    val needsCategory: Boolean = false,
 )
 
 data class DayUi(val date: LocalDate, val totals: Totals, val rows: List<TransactionRowUi>)
@@ -47,6 +51,8 @@ data class TransactionsUiState(
     val mainCurrency: String = "RUB",
     val totals: Totals = Totals(),
     val days: List<DayUi> = emptyList(),
+    /** Operations from notifications without a category, newest first, over all months. */
+    val toReview: List<String> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -70,11 +76,13 @@ class TransactionsViewModel @Inject constructor(
             accounts.observeAccounts(),
             categories.observeAll(),
             accounts.observeCurrencies(),
-        ) { items, accountList, categoryList, currencies ->
+            transactions.observeUncategorizedFromPush(),
+        ) { items, accountList, categoryList, currencies, toReview ->
             val main = MainCurrency.from(currencies)
             val names = CategoryNames(categoryList)
             val accountsByUid = accountList.associateBy { it.uid }
             TransactionsUiState(
+                toReview = toReview,
                 month = month,
                 loading = false,
                 mainCurrency = main.code,
@@ -105,6 +113,10 @@ class TransactionsViewModel @Inject constructor(
         }
         val top = names.top(tx.categoryUid)
         val icon = names.get(tx.categoryUid)?.icon ?: top?.icon
-        return TransactionRowUi(tx.uid, tx.type, title, subtitle, tx.amount, tx.currencyCode, top?.name, top?.uid, icon)
+        val fromPush = tx.source == Transaction.SOURCE_PUSH
+        return TransactionRowUi(
+            tx.uid, tx.type, title, subtitle, tx.amount, tx.currencyCode, top?.name, top?.uid, icon,
+            fromPush = fromPush, needsCategory = fromPush && tx.categoryUid == null,
+        )
     }
 }

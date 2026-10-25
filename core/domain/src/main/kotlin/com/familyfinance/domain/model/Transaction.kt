@@ -27,4 +27,10 @@ data class Transaction(
     override val updatedAt: Long,
     override val deleted: Boolean = false,
     override val deviceId: String,
-) : Syncable
+    /** Where it came from: [SOURCE_PUSH] for operations added from a bank notification, null for manual ones. */
+    val source: String? = null,
+) : Syncable {
+    companion object {
+        const val SOURCE_PUSH = "push"
+    }
+}

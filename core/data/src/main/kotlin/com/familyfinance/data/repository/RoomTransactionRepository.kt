@@ -50,6 +50,11 @@ class RoomTransactionRepository @Inject constructor(
 
     override suspend fun firstDate(): Long? = dao.firstDate()
 
+    override fun observeUncategorizedFromPush(): Flow<List<String>> = dao.observeUncategorizedFromPush()
+
+    override suspend fun categoryForNote(type: TransactionType, note: String): String? =
+        note.takeIf { it.isNotBlank() }?.let { dao.categoryForNote(type, it) }
+
     override suspend fun frequentCategoryUids(type: TransactionType, limit: Int): List<String> =
         dao.frequentCategoryUids(type, limit, window = FREQUENT_WINDOW)
 

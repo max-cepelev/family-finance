@@ -1,6 +1,7 @@
 package com.familyfinance.ui.transactions
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +68,7 @@ import com.familyfinance.ui.receipt.ReceiptEvent
 import com.familyfinance.ui.receipt.ReceiptMatchSheet
 import com.familyfinance.ui.receipt.ReceiptScanViewModel
 import com.familyfinance.ui.theme.FinanceColors
+import com.google.mlkit.common.MlKitException
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
@@ -194,7 +196,12 @@ private fun scanReceipt(context: Context, receipts: ReceiptScanViewModel) {
     val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
     GmsBarcodeScanning.getClient(context, options).startScan()
         .addOnSuccessListener { code -> code.rawValue?.let(receipts::onScanned) }
-        .addOnFailureListener { receipts.scannerFailed() }
+        // Closing the scanner with "Back" arrives as a failure too (INTERNAL in 16.1.0), so only a scanner that
+        // is not there yet (its module still downloading) is worth telling the user about.
+        .addOnFailureListener { e ->
+            Log.w("ReceiptScan", "scanner closed without a code", e)
+            if ((e as? MlKitException)?.errorCode == MlKitException.UNAVAILABLE) receipts.scannerFailed()
+        }
 }
 
 @Composable

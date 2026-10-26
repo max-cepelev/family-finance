@@ -29,8 +29,11 @@ data class Transaction(
     override val deviceId: String,
     /** Where it came from: [SOURCE_PUSH] for operations added from a bank notification, null for manual ones. */
     val source: String? = null,
+    /** [com.familyfinance.domain.receipt.ReceiptQr.canonical] of the receipt attached to it, if any. */
+    val receipt: String? = null,
 ) : Syncable {
     companion object {
         const val SOURCE_PUSH = "push"
+        const val SOURCE_RECEIPT = "receipt"
     }
 }

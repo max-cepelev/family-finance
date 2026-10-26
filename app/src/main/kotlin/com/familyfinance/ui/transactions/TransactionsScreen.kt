@@ -1,5 +1,6 @@
 package com.familyfinance.ui.transactions
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,19 +23,29 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,15 +62,55 @@ import com.familyfinance.ui.common.MoneyFormatter
 import com.familyfinance.ui.common.MonthHeader
 import com.familyfinance.ui.common.TypedAmount
 import com.familyfinance.ui.common.WhiteCard
+import com.familyfinance.ui.receipt.DebugReceipts
+import com.familyfinance.ui.receipt.ReceiptEvent
+import com.familyfinance.ui.receipt.ReceiptMatchSheet
+import com.familyfinance.ui.receipt.ReceiptScanViewModel
 import com.familyfinance.ui.theme.FinanceColors
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 
 @Composable
 fun TransactionsScreen(
     onAdd: () -> Unit,
     onOpen: (uid: String) -> Unit,
+    onOpenReceipt: (receipt: String) -> Unit,
     viewModel: TransactionsViewModel = hiltViewModel(),
+    receipts: ReceiptScanViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val match by receipts.match.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(receipts) {
+        receipts.events.collect { event ->
+            // A message must not hold up the next scan, so it is shown on the side and replaced by a newer one.
+            snackbar.currentSnackbarData?.dismiss()
+            when (event) {
+                is ReceiptEvent.OpenForm -> onOpenReceipt(event.receipt)
+                is ReceiptEvent.Notice -> scope.launch {
+                    val result = snackbar.showSnackbar(
+                        event.text,
+                        actionLabel = event.openUid?.let { "Открыть" },
+                        duration = SnackbarDuration.Long,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) event.openUid?.let(onOpen)
+                }
+            }
+        }
+    }
+    // Debug builds take a receipt from `adb shell am start … --es receipt_qr "<QR text>"`, for testing without a camera.
+    LaunchedEffect(receipts) {
+        DebugReceipts.pending.filterNotNull().collect {
+            DebugReceipts.pending.value = null
+            receipts.onScanned(it)
+        }
+    }
     val focusDay by viewModel.focusDay.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
@@ -95,15 +146,55 @@ fun TransactionsScreen(
                 }
             }
         }
-        FloatingActionButton(
-            onClick = onAdd,
-            shape = RoundedCornerShape(20.dp),
-            containerColor = FinanceColors.Primary,
-            contentColor = FinanceColors.Card,
-            elevation = FloatingActionButtonDefaults.elevation(6.dp),
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-        ) { Icon(Icons.Filled.Add, contentDescription = "Добавить операцию") }
+        Column(
+            Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                onClick = { scanReceipt(context, receipts) },
+                shape = RoundedCornerShape(16.dp),
+                color = FinanceColors.PrimarySoft,
+                contentColor = FinanceColors.OnPrimarySoft,
+                shadowElevation = 4.dp,
+            ) {
+                Row(
+                    Modifier.heightIn(min = 44.dp).padding(start = 12.dp, end = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Text("Чек", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+                }
+            }
+            FloatingActionButton(
+                onClick = onAdd,
+                shape = RoundedCornerShape(20.dp),
+                containerColor = FinanceColors.Primary,
+                contentColor = FinanceColors.Card,
+                elevation = FloatingActionButtonDefaults.elevation(6.dp),
+            ) { Icon(Icons.Filled.Add, contentDescription = "Добавить операцию") }
+        }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 140.dp))
     }
+
+    match?.let { m ->
+        ReceiptMatchSheet(
+            match = m,
+            onRemember = receipts::setRemember,
+            onAttach = receipts::attach,
+            onOther = receipts::otherPurchase,
+            onDismiss = receipts::dismiss,
+        )
+    }
+}
+
+/** Google's scanner screen; the code module may still be downloading on the first try. */
+private fun scanReceipt(context: Context, receipts: ReceiptScanViewModel) {
+    val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+    GmsBarcodeScanning.getClient(context, options).startScan()
+        .addOnSuccessListener { code -> code.rawValue?.let(receipts::onScanned) }
+        .addOnFailureListener { receipts.scannerFailed() }
 }
 
 @Composable
@@ -150,7 +241,7 @@ private fun DayCard(day: DayUi, currency: String, onOpen: (String) -> Unit) {
 }
 
 @Composable
-private fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
+internal fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -169,12 +260,18 @@ private fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
             } else {
                 CategoryAvatar(row.avatarName, row.avatarKey, icon = row.avatarIcon)
             }
-            if (row.fromPush) {
+            // The receipt mark wins: it says more about the operation than where it first came from.
+            val mark = when {
+                row.hasReceipt -> Icons.Outlined.ReceiptLong to "С чеком"
+                row.fromPush -> Icons.Outlined.NotificationsNone to "Из уведомления"
+                else -> null
+            }
+            if (mark != null) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).offset(x = 3.dp, y = 3.dp).size(18.dp).clip(CircleShape).background(FinanceColors.Card),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Outlined.NotificationsNone, contentDescription = "Из уведомления", tint = FinanceColors.Primary, modifier = Modifier.size(13.dp))
+                    Icon(mark.first, contentDescription = mark.second, tint = FinanceColors.Primary, modifier = Modifier.size(13.dp))
                 }
             }
         }

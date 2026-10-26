@@ -6,6 +6,7 @@ import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.AccountWithBalance
 import com.familyfinance.domain.model.BankCard
+import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.Currency
 import com.familyfinance.domain.model.Transaction
@@ -61,6 +62,15 @@ interface TransactionRepository {
 
     /** Categories used most often recently for [type], most frequent first. */
     suspend fun frequentCategoryUids(type: TransactionType, limit: Int): List<String>
+
+    /** The operation this receipt is already attached to. */
+    suspend fun findByReceipt(receipt: String): Transaction?
+
+    /**
+     * Operations a receipt may belong to: same type and amount, `from <= date <= to`, no receipt yet;
+     * closest to [at] first.
+     */
+    suspend fun receiptCandidates(type: TransactionType, amount: Long, at: Long, from: Long, to: Long): List<Transaction>
 }
 
 interface CategoryRepository {
@@ -89,6 +99,12 @@ interface BankCardRepository {
     suspend fun save(card: BankCard)
     /** Soft delete, so the other phone drops the link too. */
     suspend fun delete(uid: String)
+}
+
+interface CashRegisterRepository {
+    suspend fun get(fn: String): CashRegister?
+    /** Stamps updatedAt/deviceId and queues the change for sync. */
+    suspend fun save(register: CashRegister)
 }
 
 /** Writes an imported snapshot into local storage, merging by last-writer-wins. */

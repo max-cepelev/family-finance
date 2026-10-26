@@ -30,6 +30,9 @@ data class TransactionDraft(
     val note: String = "",
     /** The stored transaction being edited, null for a new one. */
     val original: Transaction? = null,
+    /** Kept through edits: where the operation came from and the receipt attached to it. */
+    val source: String? = null,
+    val receipt: String? = null,
 ) {
 
     fun currency(accounts: Map<String, Account>): String? =
@@ -79,6 +82,8 @@ data class TransactionDraft(
                 note = note.trim(),
                 updatedAt = original?.updatedAt ?: 0L,
                 deviceId = original?.deviceId.orEmpty(),
+                source = source,
+                receipt = receipt,
             ),
         )
     }
@@ -112,6 +117,8 @@ data class TransactionDraft(
             date = tx.date,
             note = tx.note,
             original = tx,
+            source = tx.source,
+            receipt = tx.receipt,
         )
 
         /** As the keypad types it: "56", "0,82". */

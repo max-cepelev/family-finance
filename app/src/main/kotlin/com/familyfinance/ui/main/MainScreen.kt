@@ -1,5 +1,6 @@
 package com.familyfinance.ui.main
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
@@ -54,7 +55,8 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
     More("more", "Ещё", Icons.Outlined.MoreHoriz),
 }
 
-private const val EDIT_ROUTE = "transaction?${EditTransactionViewModel.ARG_UID}={${EditTransactionViewModel.ARG_UID}}"
+private const val EDIT_ROUTE = "transaction?${EditTransactionViewModel.ARG_UID}={${EditTransactionViewModel.ARG_UID}}" +
+    "&${EditTransactionViewModel.ARG_RECEIPT}={${EditTransactionViewModel.ARG_RECEIPT}}"
 
 private const val SYNC_ROUTE = "sync"
 private const val CATEGORIES_ROUTE = "categories"
@@ -66,6 +68,9 @@ private fun accountRoute(uid: String?) =
 
 private fun editRoute(uid: String?) =
     if (uid == null) "transaction" else "transaction?${EditTransactionViewModel.ARG_UID}=$uid"
+
+/** A new operation filled in from a scanned receipt. */
+private fun receiptRoute(receipt: String) = "transaction?${EditTransactionViewModel.ARG_RECEIPT}=${Uri.encode(receipt)}"
 
 @Composable
 fun MainScreen() {
@@ -129,6 +134,7 @@ fun MainScreen() {
                     TransactionsScreen(
                         onAdd = { navController.navigate(editRoute(null)) },
                         onOpen = { uid -> navController.navigate(editRoute(uid)) },
+                        onOpenReceipt = { receipt -> navController.navigate(receiptRoute(receipt)) },
                     )
                 }
                 composable(Tab.Calendar.route) { CalendarScreen(onOpenDay = { openTab(Tab.Transactions) }) }
@@ -160,6 +166,11 @@ fun MainScreen() {
                     EDIT_ROUTE,
                     arguments = listOf(
                         navArgument(EditTransactionViewModel.ARG_UID) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument(EditTransactionViewModel.ARG_RECEIPT) {
                             type = NavType.StringType
                             nullable = true
                             defaultValue = null

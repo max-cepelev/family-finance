@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,6 +29,8 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -43,6 +46,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -55,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -107,8 +113,10 @@ fun EditTransactionScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var picker by remember { mutableStateOf<Picker?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
-    // The amount comes first, so the keypad is open from the start.
-    var keypad by rememberSaveable { mutableStateOf<KeypadTarget?>(KeypadTarget.AMOUNT) }
+    var receiptInfo by remember { mutableStateOf(false) }
+    // The amount comes first, so the keypad is open from the start; a receipt brings its own amount.
+    val fromReceipt = viewModel.fromReceipt
+    var keypad by rememberSaveable { mutableStateOf(if (fromReceipt) null else KeypadTarget.AMOUNT) }
     var noteOpen by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val focus = LocalFocusManager.current
@@ -133,11 +141,18 @@ fun EditTransactionScreen(
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
                 Text(
-                    if (state.isNew) "Новая операция" else "Операция",
+                    when {
+                        fromReceipt -> "Операция из чека"
+                        state.isNew -> "Новая операция"
+                        else -> "Операция"
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f).padding(start = 4.dp),
                 )
+                if (!fromReceipt && state.receipt != null) {
+                    IconButton(onClick = { receiptInfo = true }) { Icon(Icons.Outlined.ReceiptLong, contentDescription = "Чек") }
+                }
                 if (!state.isNew && !state.loading) {
                     IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Outlined.Delete, contentDescription = "Удалить") }
                 }
@@ -155,16 +170,22 @@ fun EditTransactionScreen(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SegmentedToggle(
-                    options = TYPE_LABELS,
-                    selected = TYPES.indexOf(draft.type),
-                    onSelect = { viewModel.setType(TYPES[it]) },
-                    selectedColor = { i -> if (TYPES[i] == TransactionType.TRANSFER) FinanceColors.Primary else typeColor(TYPES[i]) },
-                    modifier = Modifier.padding(top = 4.dp),
-                )
+                val receipt = state.receipt
+                if (fromReceipt && receipt != null) {
+                    ReceiptBanner(receipt, payee = draft.note, modifier = Modifier.padding(top = 4.dp))
+                } else {
+                    // A receipt fixes the type: a purchase is an expense, a refund an income.
+                    SegmentedToggle(
+                        options = TYPE_LABELS,
+                        selected = TYPES.indexOf(draft.type),
+                        onSelect = { viewModel.setType(TYPES[it]) },
+                        selectedColor = { i -> if (TYPES[i] == TransactionType.TRANSFER) FinanceColors.Primary else typeColor(TYPES[i]) },
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
 
                 AmountDisplay(
-                    label = "Сумма",
+                    label = if (fromReceipt) "Сумма из чека" else "Сумма",
                     expression = draft.amountText,
                     currency = state.currency,
                     accent = accent,
@@ -174,9 +195,20 @@ fun EditTransactionScreen(
                 )
 
                 WhiteCard(Modifier.fillMaxWidth()) {
+                    if (fromReceipt) {
+                        NoteRow(
+                            note = draft.note,
+                            resetKey = state.savedTick,
+                            onChange = viewModel::setNote,
+                            placeholder = "Магазин",
+                            icon = Icons.Outlined.Storefront,
+                            modifier = Modifier.onFocusChanged { if (it.isFocused) keypad = null },
+                        )
+                        HorizontalDivider(color = FinanceColors.Hairline)
+                    }
                     CompactRow(
                         label = "Дата",
-                        value = Dates.relative(draft.date),
+                        value = if (receipt != null && fromReceipt) "${Dates.relative(draft.date)}, ${receipt.time}" else Dates.relative(draft.date),
                         leading = { RowIcon(Icons.Outlined.CalendarMonth) },
                         onClick = { picker = Picker.DATE },
                     )
@@ -207,13 +239,15 @@ fun EditTransactionScreen(
                     } else {
                         CompactRow(
                             label = "Категория",
-                            value = state.categoryName.ifEmpty { "Без категории" },
+                            value = state.categoryName.ifEmpty { if (fromReceipt) "Выберите категорию" else "Без категории" },
                             leading = { CategoryAvatar(state.categoryTop?.name, state.categoryTop?.uid, size = 22.dp, icon = state.categoryIcon) },
                             onClick = { picker = Picker.CATEGORY },
-                            action = if (showNote) null else ("Заметка" to openNote),
+                            // The shop name is the note of a receipt operation, so there is no separate note.
+                            action = if (showNote || fromReceipt) null else ("Заметка" to openNote),
+                            isError = fromReceipt && draft.categoryUid == null,
                         )
                     }
-                    if (showNote) {
+                    if (showNote && !fromReceipt) {
                         HorizontalDivider(color = FinanceColors.Hairline)
                         NoteRow(
                             note = draft.note,
@@ -236,6 +270,10 @@ fun EditTransactionScreen(
                             }
                         }
                     }
+                }
+
+                if (fromReceipt) {
+                    RememberRegisterRow(checked = receipt?.remember ?: true, onChange = viewModel::setRemember)
                 }
 
                 if (isTransfer && state.needsToAmount) {
@@ -266,7 +304,7 @@ fun EditTransactionScreen(
                     )
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (state.isNew) {
+                    if (state.isNew && !fromReceipt) {
                         OutlinedButton(
                             onClick = viewModel::saveAndAddAnother,
                             border = BorderStroke(1.dp, FinanceColors.Primary),
@@ -311,6 +349,30 @@ fun EditTransactionScreen(
             )
             null -> Unit
         }
+    }
+
+    val receipt = state.receipt
+    if (receiptInfo && receipt != null) {
+        AlertDialog(
+            onDismissRequest = { receiptInfo = false },
+            title = { Text("Чек") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    receipt.details.forEach { (label, value) ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(label, color = FinanceColors.Muted, modifier = Modifier.width(56.dp))
+                            Text(value, style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { receiptInfo = false }) { Text("Закрыть") } },
+            dismissButton = {
+                TextButton(onClick = { receiptInfo = false; viewModel.detachReceipt() }) {
+                    Text("Открепить", color = FinanceColors.Expense)
+                }
+            },
+        )
     }
 
     if (confirmDelete) {
@@ -425,15 +487,60 @@ private fun CompactRow(
     }
 }
 
+/** "Новая касса" or "Касса знакома" above the amount of an operation made from a receipt. */
 @Composable
-private fun NoteRow(note: String, resetKey: Any?, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun ReceiptBanner(receipt: ReceiptUi, payee: String, modifier: Modifier = Modifier) {
+    val text = if (receipt.known && payee.isNotBlank()) {
+        "Касса •• ${receipt.registerTail} знакома: «$payee». Проверьте и сохраните."
+    } else {
+        "Новая касса •• ${receipt.registerTail}. Укажите магазин и категорию — следующие чеки с неё заполнятся сами."
+    }
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(FinanceColors.PrimarySoft)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(Icons.Outlined.ReceiptLong, contentDescription = null, tint = FinanceColors.OnPrimarySoft, modifier = Modifier.size(22.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = FinanceColors.OnPrimarySoft)
+    }
+}
+
+@Composable
+private fun RememberRegisterRow(checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(role = Role.Switch) { onChange(!checked) }.padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Запомнить кассу", style = MaterialTheme.typography.bodyLarge)
+            Text("Магазин и категория для следующих чеков", style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = FinanceColors.Primary),
+        )
+    }
+}
+
+@Composable
+private fun NoteRow(
+    note: String,
+    resetKey: Any?,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "Заметка",
+    icon: ImageVector = Icons.Outlined.Edit,
+) {
     var text by rememberFieldText(resetKey, note)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(Icons.Outlined.Edit, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
         BasicTextField(
             value = text,
             onValueChange = { text = it; onChange(it) },
@@ -441,11 +548,11 @@ private fun NoteRow(note: String, resetKey: Any?, onChange: (String) -> Unit, mo
             cursorBrush = SolidColor(FinanceColors.Primary),
             decorationBox = { inner ->
                 Box {
-                    if (text.isEmpty()) Text("Заметка", style = MaterialTheme.typography.bodyLarge, color = FinanceColors.Muted)
+                    if (text.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = FinanceColors.Muted)
                     inner()
                 }
             },
-            modifier = modifier.weight(1f).semantics { contentDescription = "Заметка" },
+            modifier = modifier.weight(1f).semantics { contentDescription = placeholder },
         )
     }
 }

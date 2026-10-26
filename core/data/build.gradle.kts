@@ -19,6 +19,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     testOptions { unitTests.isIncludeAndroidResources = true }
+    // Exported schemas, for migration tests.
+    sourceSets["test"].assets.srcDir("$projectDir/schemas")
 }
 
 tasks.withType<Test>().configureEach {
@@ -50,4 +52,5 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.room.testing)
 }

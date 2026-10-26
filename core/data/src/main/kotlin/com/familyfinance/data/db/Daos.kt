@@ -93,6 +93,15 @@ interface TransactionDao {
     )
     suspend fun categoryForNote(type: TransactionType, note: String): String?
 
+    @Query("SELECT * FROM transactions WHERE deleted = 0 AND receipt = :receipt LIMIT 1")
+    suspend fun findByReceipt(receipt: String): TransactionEntity?
+
+    @Query(
+        "SELECT * FROM transactions WHERE deleted = 0 AND receipt IS NULL AND type = :type AND amount = :amount " +
+            "AND date BETWEEN :from AND :to ORDER BY ABS(date - :at)",
+    )
+    suspend fun receiptCandidates(type: TransactionType, amount: Long, at: Long, from: Long, to: Long): List<TransactionEntity>
+
     @Query("SELECT MIN(date) FROM transactions WHERE deleted = 0")
     suspend fun firstDate(): Long?
 

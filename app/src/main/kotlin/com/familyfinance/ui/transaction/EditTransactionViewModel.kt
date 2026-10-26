@@ -4,11 +4,15 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.familyfinance.domain.model.Account
+import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.CategoryType
 import com.familyfinance.domain.model.Currency
+import com.familyfinance.domain.model.Transaction
 import com.familyfinance.domain.model.TransactionType
+import com.familyfinance.domain.receipt.ReceiptQr
 import com.familyfinance.domain.repository.AccountRepository
+import com.familyfinance.domain.repository.CashRegisterRepository
 import com.familyfinance.domain.repository.CategoryRepository
 import com.familyfinance.domain.repository.TransactionRepository
 import com.familyfinance.ui.common.CategoryNames
@@ -51,9 +55,24 @@ data class EditTransactionUiState(
     val toCurrency: String = "",
     val needsToAmount: Boolean = false,
     val errors: Set<DraftError> = emptySet(),
+    /** Set when the operation is made from, or carries, a scanned receipt. */
+    val receipt: ReceiptUi? = null,
     /** Increments on every "save and add another", so the screen can confirm it. */
     val savedTick: Int = 0,
     val done: Boolean = false,
+)
+
+data class ReceiptUi(
+    /** Last digits of the register's fiscal number. */
+    val registerTail: String,
+    /** Receipt time, "12:18". */
+    val time: String,
+    /** The register's shop and category were filled in from an earlier receipt. */
+    val known: Boolean,
+    /** Save the shop and category for the next receipts from this register. */
+    val remember: Boolean,
+    /** Label to value, as printed on the receipt: what the tax service needs to find it. */
+    val details: List<Pair<String, String>> = emptyList(),
 )
 
 private data class Progress(val errors: Set<DraftError>, val savedTick: Int, val done: Boolean)
@@ -64,9 +83,16 @@ class EditTransactionViewModel @Inject constructor(
     private val transactions: TransactionRepository,
     private val accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
+    private val registers: CashRegisterRepository,
 ) : ViewModel() {
 
     private val uid: String? = savedState.get<String>(ARG_UID)?.takeIf { it.isNotEmpty() }
+
+    /** A new operation from a scanned receipt; known before anything loads, so the screen can lay out for it. */
+    private val scanned: ReceiptQr? = savedState.get<String>(ARG_RECEIPT)?.let(ReceiptQr::parse)?.takeIf { uid == null }
+    val fromReceipt: Boolean get() = scanned != null
+    private val registerKnown = MutableStateFlow(false)
+    private val remember = MutableStateFlow(true)
     private val draft = MutableStateFlow<TransactionDraft?>(null)
     private val progress = MutableStateFlow(Progress(emptySet(), 0, false))
     private val frequentUids = MutableStateFlow<List<String>>(emptyList())
@@ -79,7 +105,10 @@ class EditTransactionViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val state: StateFlow<EditTransactionUiState> =
-        combine(draft, accounts, categories, frequentUids, progress) { d, accountList, categoryList, frequent, p ->
+        combine(
+            combine(draft, registerKnown, remember) { d, known, keep -> Triple(d, known, keep) },
+            accounts, categories, frequentUids, progress,
+        ) { (d, known, keep), accountList, categoryList, frequent, p ->
             if (d == null) return@combine EditTransactionUiState(isNew = uid == null, done = p.done)
             val byUid = accountList.associateBy { it.account.uid }
             val accountsByUid = byUid.mapValues { it.value.account }
@@ -108,6 +137,18 @@ class EditTransactionViewModel @Inject constructor(
                 toCurrency = byUid[d.toAccountUid]?.account?.currencyCode.orEmpty(),
                 needsToAmount = d.needsToAmount(accountsByUid),
                 errors = p.errors,
+                receipt = d.receipt?.let(ReceiptQr::parse)?.let { qr ->
+                    ReceiptUi(
+                        qr.registerTail, TIME.format(qr.dateTime), known, keep,
+                        details = listOf(
+                            "Дата" to DATE_TIME.format(qr.dateTime),
+                            "Сумма" to TransactionDraft.format(qr.amount, 2) + " ₽",
+                            "ФН" to qr.fn,
+                            "ФД" to qr.fd,
+                            "ФП" to qr.fp,
+                        ),
+                    )
+                },
                 savedTick = p.savedTick,
                 done = p.done,
             )
@@ -118,6 +159,8 @@ class EditTransactionViewModel @Inject constructor(
             val existing = uid?.let { transactions.get(it) }
             val initial = if (existing != null) {
                 TransactionDraft.from(existing, decimalsOf(accountRepository.observeCurrencies().first()))
+            } else if (scanned != null) {
+                draftFrom(scanned)
             } else {
                 TransactionDraft(date = System.currentTimeMillis(), accountUid = transactions.lastUsedAccountUid())
             }
@@ -154,6 +197,13 @@ class EditTransactionViewModel @Inject constructor(
 
     fun setNote(text: String) = edit { it.copy(note = text) }
 
+    /** For a receipt attached to the wrong operation; takes effect on save. */
+    fun detachReceipt() = edit { it.copy(receipt = null) }
+
+    fun setRemember(value: Boolean) {
+        remember.value = value
+    }
+
     fun pickAccount(uid: String) {
         // A newly chosen account brings its own currency.
         edit { it.copy(accountUid = uid, currencyCode = null) }
@@ -188,8 +238,12 @@ class EditTransactionViewModel @Inject constructor(
             is DraftResult.Invalid -> progress.update { it.copy(errors = result.errors) }
             is DraftResult.Valid -> viewModelScope.launch {
                 transactions.save(result.transaction)
+                rememberRegister(result.transaction)
                 if (addAnother) {
-                    draft.value = d.copy(amountText = "", toAmountText = "", note = "", original = null, currencyCode = null)
+                    draft.value = d.copy(
+                        amountText = "", toAmountText = "", note = "", original = null, currencyCode = null,
+                        source = null, receipt = null,
+                    )
                     progress.update { it.copy(errors = emptySet(), savedTick = it.savedTick + 1) }
                     loadFrequent(d.type)
                 } else {
@@ -205,6 +259,28 @@ class EditTransactionViewModel @Inject constructor(
             transactions.delete(uid)
             progress.update { it.copy(done = true) }
         }
+    }
+
+    private suspend fun draftFrom(qr: ReceiptQr): TransactionDraft {
+        val register = registers.get(qr.fn)
+        registerKnown.value = register != null
+        return TransactionDraft(
+            type = qr.type,
+            amountText = TransactionDraft.format(qr.amount, 2),
+            date = qr.dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            accountUid = transactions.lastUsedAccountUid(),
+            categoryUid = register?.categoryUid,
+            note = register?.payee.orEmpty(),
+            source = Transaction.SOURCE_RECEIPT,
+            receipt = qr.canonical(),
+        )
+    }
+
+    /** The shop name is what identifies a register to the user, so nothing is remembered without one. */
+    private suspend fun rememberRegister(tx: Transaction) {
+        val qr = scanned ?: return
+        if (!remember.value || tx.note.isBlank()) return
+        registers.save(CashRegister(qr.fn, tx.note, tx.categoryUid, updatedAt = 0L, deviceId = ""))
     }
 
     private suspend fun loadFrequent(type: TransactionType) {
@@ -227,6 +303,9 @@ class EditTransactionViewModel @Inject constructor(
 
     companion object {
         const val ARG_UID = "uid"
+        const val ARG_RECEIPT = "receipt"
+        private val TIME = java.time.format.DateTimeFormatter.ofPattern("H:mm")
+        private val DATE_TIME = java.time.format.DateTimeFormatter.ofPattern("d.MM.yyyy H:mm")
         private const val FREQUENT_COUNT = 6
     }
 }

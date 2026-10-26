@@ -44,6 +44,9 @@ interface SyncDao {
     @Query("INSERT INTO pending_changes (kind, uid) SELECT 'card', uid FROM bank_cards")
     suspend fun enqueueAllCards()
 
+    @Query("INSERT INTO pending_changes (kind, uid) SELECT 'register', uid FROM cash_registers")
+    suspend fun enqueueAllRegisters()
+
     @Query("SELECT `offset` FROM sync_offsets WHERE fileName = :fileName")
     suspend fun offset(fileName: String): Long?
 

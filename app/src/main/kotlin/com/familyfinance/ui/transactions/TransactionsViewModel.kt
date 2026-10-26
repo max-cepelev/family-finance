@@ -39,6 +39,8 @@ data class TransactionRowUi(
     val avatarIcon: String? = null,
     /** Added from a bank notification. */
     val fromPush: Boolean = false,
+    /** Has a scanned receipt attached. */
+    val hasReceipt: Boolean = false,
     /** From a notification and still without a category: shown for review. */
     val needsCategory: Boolean = false,
 )
@@ -88,7 +90,7 @@ class TransactionsViewModel @Inject constructor(
                 mainCurrency = main.code,
                 totals = Daily.totals(items, main),
                 days = Daily.group(items, zone, main).map { day ->
-                    DayUi(day.date, day.totals, day.transactions.map { row(it, names, accountsByUid) })
+                    DayUi(day.date, day.totals, day.transactions.map { transactionRow(it, names, accountsByUid) })
                 },
             )
         }
@@ -97,26 +99,27 @@ class TransactionsViewModel @Inject constructor(
     fun showMonth(value: YearMonth) = period.show(value)
 
     fun focusConsumed() = period.focusConsumed()
+}
 
-    private fun row(tx: Transaction, names: CategoryNames, accounts: Map<String, Account>): TransactionRowUi {
-        val account = accounts[tx.accountUid]?.name ?: "?"
-        val (title, subtitle) = when (tx.type) {
-            TransactionType.TRANSFER -> {
-                val to = accounts[tx.toAccountUid]?.name ?: "?"
-                val title = tx.note.ifBlank { "Перевод" }
-                return TransactionRowUi(tx.uid, tx.type, title, "$account → $to", tx.amount, tx.currencyCode, null, null)
-            }
-            else -> {
-                val category = names.label(tx.categoryUid) ?: "Без категории"
-                if (tx.note.isBlank()) category to account else tx.note to "$category · $account"
-            }
+/** How an operation shows in a list: title, "category · account" subtitle, avatar and marks. */
+fun transactionRow(tx: Transaction, names: CategoryNames, accounts: Map<String, Account>): TransactionRowUi {
+    val account = accounts[tx.accountUid]?.name ?: "?"
+    val (title, subtitle) = when (tx.type) {
+        TransactionType.TRANSFER -> {
+            val to = accounts[tx.toAccountUid]?.name ?: "?"
+            val title = tx.note.ifBlank { "Перевод" }
+            return TransactionRowUi(tx.uid, tx.type, title, "$account → $to", tx.amount, tx.currencyCode, null, null)
         }
-        val top = names.top(tx.categoryUid)
-        val icon = names.get(tx.categoryUid)?.icon ?: top?.icon
-        val fromPush = tx.source == Transaction.SOURCE_PUSH
-        return TransactionRowUi(
-            tx.uid, tx.type, title, subtitle, tx.amount, tx.currencyCode, top?.name, top?.uid, icon,
-            fromPush = fromPush, needsCategory = fromPush && tx.categoryUid == null,
-        )
+        else -> {
+            val category = names.label(tx.categoryUid) ?: "Без категории"
+            if (tx.note.isBlank()) category to account else tx.note to "$category · $account"
+        }
     }
+    val top = names.top(tx.categoryUid)
+    val icon = names.get(tx.categoryUid)?.icon ?: top?.icon
+    val fromPush = tx.source == Transaction.SOURCE_PUSH
+    return TransactionRowUi(
+        tx.uid, tx.type, title, subtitle, tx.amount, tx.currencyCode, top?.name, top?.uid, icon,
+        fromPush = fromPush, hasReceipt = tx.receipt != null, needsCategory = fromPush && tx.categoryUid == null,
+    )
 }

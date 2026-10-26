@@ -2,6 +2,7 @@ package com.familyfinance.domain.sync
 
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.BankCard
+import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.CategoryType
@@ -98,13 +99,20 @@ sealed interface LogEntry {
         val accountUid: String, val accountAmount: Long, val toAccountUid: String? = null,
         val toAccountAmount: Long? = null, val categoryUid: String? = null, val note: String = "",
         val updatedAt: Long, val deleted: Boolean, val deviceId: String,
-        val source: String? = null,
+        val source: String? = null, val receipt: String? = null,
     ) : LogEntry
 
     @Serializable
     @SerialName("card")
     data class BankCardRecord(
         val uid: String, val bank: String, val last4: String? = null, val accountUid: String,
+        val updatedAt: Long, val deleted: Boolean, val deviceId: String,
+    ) : LogEntry
+
+    @Serializable
+    @SerialName("register")
+    data class CashRegisterRecord(
+        val uid: String, val payee: String, val categoryUid: String? = null,
         val updatedAt: Long, val deleted: Boolean, val deviceId: String,
     ) : LogEntry
 
@@ -117,9 +125,10 @@ sealed interface LogEntry {
         is CategoryRecord -> Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
         is TransactionRecord -> Transaction(
             uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-            categoryUid, note, updatedAt, deleted, deviceId, source,
+            categoryUid, note, updatedAt, deleted, deviceId, source, receipt,
         )
         is BankCardRecord -> BankCard(uid, bank, last4, accountUid, updatedAt, deleted, deviceId)
+        is CashRegisterRecord -> CashRegister(uid, payee, categoryUid, updatedAt, deleted, deviceId)
     }
 
     companion object {
@@ -131,10 +140,11 @@ sealed interface LogEntry {
             is Transaction -> with(record) {
                 TransactionRecord(
                     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-                    categoryUid, note, updatedAt, deleted, deviceId, source,
+                    categoryUid, note, updatedAt, deleted, deviceId, source, receipt,
                 )
             }
             is BankCard -> with(record) { BankCardRecord(uid, bank, last4, accountUid, updatedAt, deleted, deviceId) }
+            is CashRegister -> with(record) { CashRegisterRecord(uid, payee, categoryUid, updatedAt, deleted, deviceId) }
             else -> error("Unknown record type ${record::class.simpleName}")
         }
     }

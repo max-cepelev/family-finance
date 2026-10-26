@@ -83,6 +83,8 @@ data class TransactionEntity(
     val deviceId: String,
     /** "push" for operations from bank notifications; added in schema version 4. */
     val source: String? = null,
+    /** Canonical QR text of the attached receipt; added in schema version 5. */
+    val receipt: String? = null,
 )
 
 /** A card of a bank linked to an account; last4 null is the bank's fallback. Synced like other records. */
@@ -92,6 +94,17 @@ data class BankCardEntity(
     val bank: String,
     val last4: String?,
     val accountUid: String,
+    val updatedAt: Long,
+    val deleted: Boolean,
+    val deviceId: String,
+)
+
+/** Shop name and category remembered for a cash register (uid = fiscal storage number). Synced. */
+@Entity(tableName = "cash_registers")
+data class CashRegisterEntity(
+    @PrimaryKey val uid: String,
+    val payee: String,
+    val categoryUid: String?,
     val updatedAt: Long,
     val deleted: Boolean,
     val deviceId: String,

@@ -58,6 +58,10 @@ class RoomTransactionRepository @Inject constructor(
     override suspend fun frequentCategoryUids(type: TransactionType, limit: Int): List<String> =
         dao.frequentCategoryUids(type, limit, window = FREQUENT_WINDOW)
 
+    override suspend fun findByReceipt(receipt: String): Transaction? = dao.findByReceipt(receipt)?.toDomain()
+
+    override suspend fun receiptCandidates(type: TransactionType, amount: Long, at: Long, from: Long, to: Long): List<Transaction> =
+        dao.receiptCandidates(type, amount, at, from, to).map { it.toDomain() }
 
     private companion object {
         /** Recent operations considered for "frequent categories". */

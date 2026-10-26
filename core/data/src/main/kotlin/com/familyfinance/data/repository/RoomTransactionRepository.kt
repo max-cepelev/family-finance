@@ -46,6 +46,13 @@ class RoomTransactionRepository @Inject constructor(
         changes.record(deleted.toDomain())
     }
 
+    override suspend fun splitParts(splitUid: String): List<Transaction> = dao.splitParts(splitUid).map { it.toDomain() }
+
+    override suspend fun saveAll(transactions: List<Transaction>, deleteUids: List<String>) = db.withTransaction {
+        transactions.forEach { save(it) }
+        deleteUids.forEach { delete(it) }
+    }
+
     override suspend fun lastUsedAccountUid(): String? = dao.lastUsedAccountUid()
 
     override suspend fun firstDate(): Long? = dao.firstDate()

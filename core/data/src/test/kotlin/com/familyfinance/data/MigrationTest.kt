@@ -42,6 +42,26 @@ class MigrationTest {
         db.close()
     }
 
+    @Test fun `version 5 operations are not split`() = runTest {
+        helper.createDatabase(NAME, 5).apply {
+            execSQL(
+                "INSERT INTO transactions (uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, " +
+                    "toAccountAmount, categoryUid, note, updatedAt, deleted, deviceId, source, receipt) " +
+                    "VALUES ('tx', 'EXPENSE', 1, 39297, 'RUB', 'acc', 39297, NULL, NULL, 'food', 'Magnit', 5, 0, 'me', 'push', 'qr')",
+            )
+            close()
+        }
+        helper.runMigrationsAndValidate(NAME, 6, true).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), FinanceDatabase::class.java, NAME)
+            .allowMainThreadQueries().build()
+        val tx = db.transactionDao().get("tx")!!
+        assertEquals("qr", tx.receipt)
+        assertNull(tx.splitUid)
+        assertEquals(0, tx.splitIndex)
+        db.close()
+    }
+
     private companion object {
         const val NAME = "migration-test"
     }

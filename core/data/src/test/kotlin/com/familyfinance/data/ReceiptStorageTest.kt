@@ -70,7 +70,22 @@ class ReceiptStorageTest {
         assertEquals(listOf("far"), candidates())
     }
 
-    @Test fun `deleted operation releases its receipt`() = runTest {
+    @Test fun `split parts are saved and replaced together and never match a receipt`() = runTest {
+        val a = expense("a", 30000, at).copy(splitUid = "a", splitIndex = 0, categoryUid = "food")
+        val b = expense("b", 9297, at).copy(splitUid = "a", splitIndex = 1, categoryUid = "chem")
+        val c = expense("c", 39297, at).copy(splitUid = "a", splitIndex = 2, categoryUid = "toys")
+        transactions.saveAll(listOf(a, b, c))
+        assertEquals(listOf("a", "b", "c"), transactions.splitParts("a").map { it.uid })
+        // A part with the receipt's amount is still a part of another purchase.
+        assertEquals(emptyList<String>(), candidates())
+
+        transactions.saveAll(listOf(a.copy(amount = 39297, splitUid = null)), deleteUids = listOf("b", "c"))
+        assertEquals(emptyList<Transaction>(), transactions.splitParts("a"))
+        assertNull(transactions.get("a")!!.splitUid)
+        assertTrue(transactions.get("b")!!.deleted)
+    }
+
+        @Test fun `deleted operation releases its receipt`() = runTest {
         transactions.save(expense("tx", 39297, at).copy(receipt = receipt))
         transactions.delete("tx")
         assertNull(transactions.findByReceipt(receipt))

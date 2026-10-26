@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -31,7 +32,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -93,9 +94,10 @@ fun AccountEditScreen(onClose: () -> Unit, viewModel: AccountEditViewModel = hil
                             ColoredAmount(MoneyFormatter.format(state.balance, form.currencyCode), FinanceColors.Card, style = MaterialTheme.typography.headlineSmall, weight = FontWeight.Medium)
                             Text(Dates.operations(state.operations), style = MaterialTheme.typography.labelMedium, color = FinanceColors.OnPrimaryMuted)
                         }
-                        OutlinedButton(onClick = { dialog = AccountDialog.BALANCE }, border = BorderStroke(1.dp, FinanceColors.OnPrimaryMuted)) {
-                            Text("Изменить остаток", color = FinanceColors.Card, fontWeight = FontWeight.Medium)
-                        }
+                        OutlinedIconButton(
+                            onClick = { dialog = AccountDialog.BALANCE },
+                            border = BorderStroke(1.dp, FinanceColors.OnPrimaryMuted),
+                        ) { Icon(Icons.Outlined.Edit, contentDescription = "Изменить остаток", tint = FinanceColors.Card) }
                     }
                 }
             }

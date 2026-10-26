@@ -26,11 +26,11 @@ fun CategoryEntity.toDomain() =
 
 fun Transaction.toEntity() = TransactionEntity(
     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-    categoryUid, note, updatedAt, deleted, deviceId, source, receipt,
+    categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex,
 )
 fun TransactionEntity.toDomain() = Transaction(
     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-    categoryUid, note, updatedAt, deleted, deviceId, source, receipt,
+    categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex,
 )
 
 fun BankCard.toEntity() = BankCardEntity(uid, bank, last4, accountUid, updatedAt, deleted, deviceId)

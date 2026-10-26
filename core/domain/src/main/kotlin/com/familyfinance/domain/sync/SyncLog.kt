@@ -100,6 +100,7 @@ sealed interface LogEntry {
         val toAccountAmount: Long? = null, val categoryUid: String? = null, val note: String = "",
         val updatedAt: Long, val deleted: Boolean, val deviceId: String,
         val source: String? = null, val receipt: String? = null,
+        val splitUid: String? = null, val splitIndex: Int = 0,
     ) : LogEntry
 
     @Serializable
@@ -125,7 +126,7 @@ sealed interface LogEntry {
         is CategoryRecord -> Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
         is TransactionRecord -> Transaction(
             uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-            categoryUid, note, updatedAt, deleted, deviceId, source, receipt,
+            categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex,
         )
         is BankCardRecord -> BankCard(uid, bank, last4, accountUid, updatedAt, deleted, deviceId)
         is CashRegisterRecord -> CashRegister(uid, payee, categoryUid, updatedAt, deleted, deviceId)
@@ -140,7 +141,7 @@ sealed interface LogEntry {
             is Transaction -> with(record) {
                 TransactionRecord(
                     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-                    categoryUid, note, updatedAt, deleted, deviceId, source, receipt,
+                    categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex,
                 )
             }
             is BankCard -> with(record) { BankCardRecord(uid, bank, last4, accountUid, updatedAt, deleted, deviceId) }

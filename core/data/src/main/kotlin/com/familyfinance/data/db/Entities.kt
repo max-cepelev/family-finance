@@ -64,7 +64,7 @@ data class CategoryEntity(
 
 @Entity(
     tableName = "transactions",
-    indices = [Index("date"), Index("accountUid"), Index("toAccountUid"), Index("categoryUid")],
+    indices = [Index("date"), Index("accountUid"), Index("toAccountUid"), Index("categoryUid"), Index("splitUid")],
 )
 data class TransactionEntity(
     @PrimaryKey val uid: String,
@@ -85,6 +85,9 @@ data class TransactionEntity(
     val source: String? = null,
     /** Canonical QR text of the attached receipt; added in schema version 5. */
     val receipt: String? = null,
+    /** Parts of an operation split across categories share it; added in schema version 6. */
+    val splitUid: String? = null,
+    @ColumnInfo(defaultValue = "0") val splitIndex: Int = 0,
 )
 
 /** A card of a bank linked to an account; last4 null is the bank's fallback. Synced like other records. */

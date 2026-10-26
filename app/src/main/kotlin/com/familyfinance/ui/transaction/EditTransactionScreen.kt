@@ -20,11 +20,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.CallSplit
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
@@ -114,6 +116,10 @@ fun EditTransactionScreen(
     var picker by remember { mutableStateOf<Picker?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var receiptInfo by remember { mutableStateOf(false) }
+    var splitOpen by rememberSaveable { mutableStateOf(false) }
+    var activePart by rememberSaveable { mutableStateOf(0) }
+    // Which part the category picker is for; -1 adds a new part.
+    var partPicker by remember { mutableStateOf<Int?>(null) }
     // The amount comes first, so the keypad is open from the start; a receipt brings its own amount.
     val fromReceipt = viewModel.fromReceipt
     var keypad by rememberSaveable { mutableStateOf(if (fromReceipt) null else KeypadTarget.AMOUNT) }
@@ -137,7 +143,29 @@ fun EditTransactionScreen(
     }
 
     Box(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Column(Modifier.fillMaxSize()) {
+        val splitDraft = state.draft
+        if (splitOpen && splitDraft != null) {
+            val total = TransactionDraft.parseAmount(splitDraft.amountText, 2)
+            SplitEditor(
+                title = listOf(splitDraft.note.ifBlank { "Операция" }, Dates.relative(splitDraft.date)).joinToString(" · "),
+                total = total?.let { MoneyFormatter.format(it, state.currency) }.orEmpty(),
+                currency = state.currency,
+                parts = state.parts,
+                active = activePart,
+                hasError = DraftError.SPLIT in state.errors,
+                onActivate = { activePart = it },
+                onPickCategory = { partPicker = it },
+                onRemove = { i ->
+                    viewModel.removePart(i)
+                    if (activePart >= i) activePart = (activePart - 1).coerceAtLeast(0)
+                },
+                onAdd = { partPicker = -1 },
+                onKey = { viewModel.pressPartKey(activePart, it) },
+                onClear = { viewModel.clearPart(activePart) },
+                onSave = viewModel::save,
+                onClose = { viewModel.closeSplit(); splitOpen = false },
+            )
+        } else Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
                 Text(
@@ -236,6 +264,14 @@ fun EditTransactionScreen(
                             onClick = { picker = Picker.TO_ACCOUNT },
                             action = if (showNote) null else ("Заметка" to openNote),
                         )
+                    } else if (draft.isSplit) {
+                        CompactRow(
+                            label = "Категории",
+                            value = state.parts.joinToString(", ") { it.shortName },
+                            leading = { RowIcon(Icons.AutoMirrored.Outlined.CallSplit) },
+                            onClick = { splitOpen = true; activePart = 0 },
+                            action = if (showNote || fromReceipt) null else ("Заметка" to openNote),
+                        )
                     } else {
                         CompactRow(
                             label = "Категория",
@@ -245,6 +281,12 @@ fun EditTransactionScreen(
                             // The shop name is the note of a receipt operation, so there is no separate note.
                             action = if (showNote || fromReceipt) null else ("Заметка" to openNote),
                             isError = fromReceipt && draft.categoryUid == null,
+                            trailingIcon = Icons.AutoMirrored.Outlined.CallSplit to "Разделить по категориям",
+                            onTrailingIcon = {
+                                viewModel.openSplit()
+                                activePart = 0
+                                splitOpen = true
+                            },
                         )
                     }
                     if (showNote && !fromReceipt) {
@@ -259,7 +301,7 @@ fun EditTransactionScreen(
                     }
                 }
 
-                if (state.frequent.isNotEmpty()) {
+                if (state.frequent.isNotEmpty() && !draft.isSplit) {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -348,6 +390,22 @@ fun EditTransactionScreen(
                 onPick = { picker = null; viewModel.pickCategory(it) },
             )
             null -> Unit
+        }
+        partPicker?.let { index ->
+            CategoryPickerDialog(
+                categories = state.categories,
+                selected = state.parts.getOrNull(index)?.categoryUid,
+                onDismiss = { partPicker = null },
+                onPick = { uid ->
+                    partPicker = null
+                    if (index < 0) {
+                        activePart = state.parts.size
+                        viewModel.addPart(uid)
+                    } else {
+                        viewModel.setPartCategory(index, uid)
+                    }
+                },
+            )
         }
     }
 
@@ -454,6 +512,8 @@ private fun CompactRow(
     isError: Boolean = false,
     trailing: String? = null,
     action: Pair<String, () -> Unit>? = null,
+    trailingIcon: Pair<ImageVector, String>? = null,
+    onTrailingIcon: () -> Unit = {},
 ) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp),
@@ -483,7 +543,15 @@ private fun CompactRow(
         if (action != null) {
             TextButton(onClick = action.second) { Text(action.first, color = FinanceColors.Muted) }
         }
-        if (action == null && trailing == null) Spacer(Modifier.width(8.dp))
+        if (trailingIcon != null) {
+            IconButton(onClick = onTrailingIcon) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.PrimarySoft),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(trailingIcon.first, contentDescription = trailingIcon.second, tint = FinanceColors.OnPrimarySoft, modifier = Modifier.size(20.dp)) }
+            }
+        }
+        if (action == null && trailing == null && trailingIcon == null) Spacer(Modifier.width(8.dp))
     }
 }
 

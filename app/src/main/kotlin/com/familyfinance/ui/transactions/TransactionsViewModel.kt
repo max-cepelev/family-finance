@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.Daily
 import com.familyfinance.domain.model.MainCurrency
+import com.familyfinance.domain.model.Split
 import com.familyfinance.domain.model.Totals
 import com.familyfinance.domain.model.Transaction
 import com.familyfinance.domain.model.TransactionType
@@ -41,6 +42,8 @@ data class TransactionRowUi(
     val fromPush: Boolean = false,
     /** Has a scanned receipt attached. */
     val hasReceipt: Boolean = false,
+    /** Split across categories; the row stands for all its parts. */
+    val isSplit: Boolean = false,
     /** From a notification and still without a category: shown for review. */
     val needsCategory: Boolean = false,
 )
@@ -90,7 +93,7 @@ class TransactionsViewModel @Inject constructor(
                 mainCurrency = main.code,
                 totals = Daily.totals(items, main),
                 days = Daily.group(items, zone, main).map { day ->
-                    DayUi(day.date, day.totals, day.transactions.map { transactionRow(it, names, accountsByUid) })
+                    DayUi(day.date, day.totals, rows(day.transactions, names, accountsByUid))
                 },
             )
         }
@@ -100,6 +103,22 @@ class TransactionsViewModel @Inject constructor(
 
     fun focusConsumed() = period.focusConsumed()
 }
+
+/** Operations as list rows, the parts of a split operation joined into one. */
+fun rows(transactions: List<Transaction>, names: CategoryNames, accounts: Map<String, Account>): List<TransactionRowUi> =
+    transactions.groupBy { it.splitUid ?: it.uid }.values.map { group ->
+        if (group.size == 1 && group[0].splitUid == null) return@map transactionRow(group[0], names, accounts)
+        val parts = group.sortedBy { it.splitIndex }
+        val row = transactionRow(Split.whole(parts), names, accounts)
+        val categories = parts.joinToString(", ") { names.get(it.categoryUid)?.name ?: "Без категории" }
+        val account = accounts[parts[0].accountUid]?.name ?: "?"
+        row.copy(
+            title = parts[0].note.ifBlank { "Разделённая операция" },
+            subtitle = "$categories · $account",
+            isSplit = true,
+            needsCategory = false,
+        )
+    }
 
 /** How an operation shows in a list: title, "category · account" subtitle, avatar and marks. */
 fun transactionRow(tx: Transaction, names: CategoryNames, accounts: Map<String, Account>): TransactionRowUi {

@@ -31,6 +31,10 @@ data class Transaction(
     val source: String? = null,
     /** [com.familyfinance.domain.receipt.ReceiptQr.canonical] of the receipt attached to it, if any. */
     val receipt: String? = null,
+    /** Set on every part of an operation split across categories; the same for all its parts. See [Split]. */
+    val splitUid: String? = null,
+    /** Position of the part; 0 is the one that takes the remainder. */
+    val splitIndex: Int = 0,
 ) : Syncable {
     companion object {
         const val SOURCE_PUSH = "push"

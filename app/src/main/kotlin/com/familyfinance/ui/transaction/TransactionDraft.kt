@@ -8,7 +8,10 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.UUID
 
-enum class DraftError { AMOUNT, ACCOUNT, TO_ACCOUNT, TO_AMOUNT }
+enum class DraftError { AMOUNT, ACCOUNT, TO_ACCOUNT, TO_AMOUNT, SPLIT }
+
+/** A part of a split operation as typed; the first part's amount is the remainder and not typed. */
+data class PartDraft(val categoryUid: String?, val amountText: String = "")
 
 sealed interface DraftResult {
     data class Valid(val transaction: Transaction) : DraftResult
@@ -33,7 +36,13 @@ data class TransactionDraft(
     /** Kept through edits: where the operation came from and the receipt attached to it. */
     val source: String? = null,
     val receipt: String? = null,
+    /** Split across categories when there are two parts or more; one part means the split editor was just opened. */
+    val parts: List<PartDraft> = emptyList(),
+    /** Stored uids of the parts being edited, by position. */
+    val partUids: List<String> = emptyList(),
 ) {
+    val isSplit: Boolean get() = parts.size >= 2
+
 
     fun currency(accounts: Map<String, Account>): String? =
         currencyCode ?: accounts[accountUid]?.currencyCode

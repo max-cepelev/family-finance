@@ -48,6 +48,12 @@ interface TransactionRepository {
     /** Soft delete, so the deletion can be synced. */
     suspend fun delete(uid: String)
 
+    /** Parts of a split operation, first part first. */
+    suspend fun splitParts(splitUid: String): List<Transaction>
+
+    /** Saves [transactions] and deletes [deleteUids] in one go: an operation's parts change together. */
+    suspend fun saveAll(transactions: List<Transaction>, deleteUids: List<String> = emptyList())
+
     /** Date of the oldest transaction, epoch millis; null when there are none. */
     suspend fun firstDate(): Long?
 

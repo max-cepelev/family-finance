@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.CallSplit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.NotificationsNone
@@ -259,6 +260,10 @@ internal fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
             if (row.type == TransactionType.TRANSFER) {
                 Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
+                }
+            } else if (row.isSplit) {
+                Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.PrimarySoft), contentAlignment = Alignment.Center) {
+                    Icon(Icons.AutoMirrored.Outlined.CallSplit, contentDescription = "Разделена по категориям", tint = FinanceColors.OnPrimarySoft, modifier = Modifier.size(20.dp))
                 }
             } else if (row.needsCategory) {
                 Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.Track), contentAlignment = Alignment.Center) {

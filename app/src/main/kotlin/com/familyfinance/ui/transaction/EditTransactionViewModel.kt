@@ -8,6 +8,7 @@ import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.CategoryType
 import com.familyfinance.domain.model.Currency
+import com.familyfinance.domain.model.Split
 import com.familyfinance.domain.model.Transaction
 import com.familyfinance.domain.model.TransactionType
 import com.familyfinance.domain.receipt.ReceiptQr
@@ -57,9 +58,25 @@ data class EditTransactionUiState(
     val errors: Set<DraftError> = emptySet(),
     /** Set when the operation is made from, or carries, a scanned receipt. */
     val receipt: ReceiptUi? = null,
+    /** Parts of the split being edited; the first one shows the remainder. Empty when not split. */
+    val parts: List<PartUi> = emptyList(),
     /** Increments on every "save and add another", so the screen can confirm it. */
     val savedTick: Int = 0,
     val done: Boolean = false,
+)
+
+data class PartUi(
+    val categoryUid: String?,
+    /** "Питание › Фрукты/Овощи"; empty for a part without a category. */
+    val label: String,
+    /** Leaf name, for listing the parts in one line. */
+    val shortName: String,
+    val top: Category?,
+    val icon: String?,
+    /** What the keypad typed; for the first part, the computed remainder. */
+    val amountText: String,
+    /** In minor units, null while the typed text is not a number. */
+    val amount: Long?,
 )
 
 data class ReceiptUi(
@@ -137,6 +154,7 @@ class EditTransactionViewModel @Inject constructor(
                 toCurrency = byUid[d.toAccountUid]?.account?.currencyCode.orEmpty(),
                 needsToAmount = d.needsToAmount(accountsByUid),
                 errors = p.errors,
+                parts = partsUi(d, names, decimalsOf(currencies.value)(d.currency(accountsByUid) ?: "RUB")),
                 receipt = d.receipt?.let(ReceiptQr::parse)?.let { qr ->
                     ReceiptUi(
                         qr.registerTail, TIME.format(qr.dateTime), known, keep,
@@ -158,7 +176,16 @@ class EditTransactionViewModel @Inject constructor(
         viewModelScope.launch {
             val existing = uid?.let { transactions.get(it) }
             val initial = if (existing != null) {
-                TransactionDraft.from(existing, decimalsOf(accountRepository.observeCurrencies().first()))
+                val decimals = decimalsOf(accountRepository.observeCurrencies().first())
+                val parts = existing.splitUid?.let { transactions.splitParts(it) }.orEmpty()
+                if (parts.size >= 2) {
+                    TransactionDraft.from(Split.whole(parts), decimals).copy(
+                        parts = parts.map { PartDraft(it.categoryUid, TransactionDraft.format(it.amount, decimals(it.currencyCode))) },
+                        partUids = parts.map { it.uid },
+                    )
+                } else {
+                    TransactionDraft.from(existing, decimals)
+                }
             } else if (scanned != null) {
                 draftFrom(scanned)
             } else {
@@ -172,10 +199,11 @@ class EditTransactionViewModel @Inject constructor(
     fun setType(type: TransactionType) {
         val current = draft.value ?: return
         if (current.type == type) return
-        // Categories are per type, so the old one never fits the new type.
+        // Categories are per type, so the old one never fits the new type, nor do the parts' ones.
         draft.value = current.copy(
             type = type,
             categoryUid = null,
+            parts = emptyList(),
             toAccountUid = current.toAccountUid.takeIf { type == TransactionType.TRANSFER },
         )
         viewModelScope.launch { loadFrequent(type) }
@@ -196,6 +224,37 @@ class EditTransactionViewModel @Inject constructor(
         edit { if (toAccount) it.copy(toAmountText = "") else it.copy(amountText = "") }
 
     fun setNote(text: String) = edit { it.copy(note = text) }
+
+    /** Starts the split editor with the current category as the part that takes the remainder. */
+    fun openSplit() = edit { if (it.parts.isEmpty()) it.copy(parts = listOf(PartDraft(it.categoryUid))) else it }
+
+    /** Leaves the split editor; a single part is no split, it is just the category. */
+    fun closeSplit() = edit { if (it.parts.size == 1) it.copy(categoryUid = it.parts[0].categoryUid, parts = emptyList()) else it }
+
+    fun addPart(categoryUid: String?) {
+        edit { it.copy(parts = it.parts + PartDraft(categoryUid)) }
+        clearErrors(DraftError.SPLIT)
+    }
+
+    fun setPartCategory(index: Int, categoryUid: String?) = edit { d ->
+        d.copy(parts = d.parts.mapIndexed { i, p -> if (i == index) p.copy(categoryUid = categoryUid) else p })
+    }
+
+    fun removePart(index: Int) {
+        if (index == 0) return
+        edit { d -> d.copy(parts = d.parts.filterIndexed { i, _ -> i != index }) }
+        clearErrors(DraftError.SPLIT)
+    }
+
+    fun pressPartKey(index: Int, key: Char) {
+        if (index == 0) return
+        edit { d -> d.copy(parts = d.parts.mapIndexed { i, p -> if (i == index) p.copy(amountText = Calculator.press(p.amountText, key)) else p }) }
+        clearErrors(DraftError.SPLIT)
+    }
+
+    fun clearPart(index: Int) = edit { d ->
+        d.copy(parts = d.parts.mapIndexed { i, p -> if (i == index) p.copy(amountText = "") else p })
+    }
 
     /** For a receipt attached to the wrong operation; takes effect on save. */
     fun detachReceipt() = edit { it.copy(receipt = null) }
@@ -237,12 +296,12 @@ class EditTransactionViewModel @Inject constructor(
         when (val result = d.build(byUid, decimalsOf(currencies.value))) {
             is DraftResult.Invalid -> progress.update { it.copy(errors = result.errors) }
             is DraftResult.Valid -> viewModelScope.launch {
-                transactions.save(result.transaction)
+                if (!saveParts(d, result.transaction)) return@launch
                 rememberRegister(result.transaction)
                 if (addAnother) {
                     draft.value = d.copy(
                         amountText = "", toAmountText = "", note = "", original = null, currencyCode = null,
-                        source = null, receipt = null,
+                        source = null, receipt = null, parts = emptyList(), partUids = emptyList(),
                     )
                     progress.update { it.copy(errors = emptySet(), savedTick = it.savedTick + 1) }
                     loadFrequent(d.type)
@@ -255,9 +314,54 @@ class EditTransactionViewModel @Inject constructor(
 
     fun delete() {
         val uid = uid ?: return
+        val parts = draft.value?.partUids.orEmpty()
         viewModelScope.launch {
-            transactions.delete(uid)
+            if (parts.isEmpty()) transactions.delete(uid) else transactions.saveAll(emptyList(), deleteUids = parts)
             progress.update { it.copy(done = true) }
+        }
+    }
+
+    /**
+     * Writes the operation, as parts when split. A split that went back to one part, or parts that were removed,
+     * leave deletions behind. False when the parts do not add up, with the error shown.
+     */
+    private suspend fun saveParts(d: TransactionDraft, whole: Transaction): Boolean {
+        val currency = whole.currencyCode
+        val decimals = decimalsOf(currencies.value)(currency)
+        val written = if (d.isSplit) {
+            val parts = d.parts.mapIndexed { i, p ->
+                Split.Part(p.categoryUid, if (i == 0) 0 else TransactionDraft.parseAmount(p.amountText, decimals) ?: 0)
+            }
+            when (val result = Split.build(whole, parts, d.partUids) { java.util.UUID.randomUUID().toString() }) {
+                is Split.Result.Valid -> result.transactions
+                else -> {
+                    progress.update { it.copy(errors = it.errors + DraftError.SPLIT) }
+                    return false
+                }
+            }
+        } else {
+            val single = d.parts.singleOrNull()?.let { whole.copy(categoryUid = it.categoryUid) } ?: whole
+            listOf(single.copy(splitUid = null, splitIndex = 0))
+        }
+        transactions.saveAll(written, deleteUids = d.partUids - written.map { it.uid }.toSet())
+        return true
+    }
+
+    private fun partsUi(d: TransactionDraft, names: CategoryNames, decimals: Int): List<PartUi> {
+        if (d.parts.isEmpty()) return emptyList()
+        val typed = d.parts.map { TransactionDraft.parseAmount(it.amountText, decimals) }
+        val total = TransactionDraft.parseAmount(d.amountText, decimals) ?: 0L
+        val remainder = Split.remainder(total, typed.drop(1).map { it ?: 0L })
+        return d.parts.mapIndexed { i, p ->
+            PartUi(
+                categoryUid = p.categoryUid,
+                label = names.label(p.categoryUid).orEmpty(),
+                shortName = names.get(p.categoryUid)?.name ?: "Без категории",
+                top = names.top(p.categoryUid),
+                icon = names.get(p.categoryUid)?.icon ?: names.top(p.categoryUid)?.icon,
+                amountText = if (i == 0) TransactionDraft.format(remainder, decimals) else p.amountText,
+                amount = if (i == 0) remainder else typed[i],
+            )
         }
     }
 

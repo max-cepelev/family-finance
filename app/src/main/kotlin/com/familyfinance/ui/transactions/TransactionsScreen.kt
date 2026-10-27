@@ -311,7 +311,7 @@ private fun ReviewBanner(count: Int, onClick: () -> Unit) {
     ) {
         Icon(Icons.Outlined.NotificationsNone, contentDescription = null, tint = Color(0xFF6A4A0C))
         Text(
-            Dates.plural(count, "операция", "операции", "операций") + " из уведомлений без категории",
+            Dates.plural(count, "операция", "операции", "операций") + " из пушей и выписок без категории",
             style = MaterialTheme.typography.bodyMedium,
             color = Color(0xFF6A4A0C),
             modifier = Modifier.weight(1f),

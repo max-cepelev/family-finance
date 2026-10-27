@@ -48,6 +48,18 @@ interface TransactionRepository {
     /** Soft delete, so the deletion can be synced. */
     suspend fun delete(uid: String)
 
+    /** Which of these statement ids are already on some operation. */
+    suspend fun knownExternalIds(ids: List<String>): Set<String>
+
+    /**
+     * Operations a statement line may already be, typically one added from a push: same account, type and amount,
+     * `from <= date <= to`, not from a statement yet; closest to [at] first.
+     */
+    suspend fun statementCandidates(accountUid: String, type: TransactionType, amount: Long, at: Long, from: Long, to: Long): List<Transaction>
+
+    /** Operations on [accountUid] of this type and amount with `from <= date <= to`, whatever their origin. */
+    suspend fun findSame(accountUid: String, type: TransactionType, amount: Long, from: Long, to: Long): List<Transaction>
+
     /** Parts of a split operation, first part first. */
     suspend fun splitParts(splitUid: String): List<Transaction>
 
@@ -60,7 +72,7 @@ interface TransactionRepository {
     /** Account of the newest transaction, a sensible default for a new one. */
     suspend fun lastUsedAccountUid(): String?
 
-    /** Operations added from notifications that still have no category, newest first. */
+    /** Operations added from notifications or statements that still have no category, newest first. */
     fun observeUncategorizedFromPush(): Flow<List<String>>
 
     /** Category of the newest operation of [type] with this exact note (payee), ignoring case. */

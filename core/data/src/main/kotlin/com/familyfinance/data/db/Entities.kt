@@ -45,6 +45,10 @@ data class AccountEntity(
     val updatedAt: Long,
     val deleted: Boolean,
     val deviceId: String,
+    /** Credit card settings; added in schema version 7. */
+    @ColumnInfo(defaultValue = "0") val isCredit: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val creditLimit: Long = 0,
+    val paymentDay: Int? = null,
 )
 
 @Entity(tableName = "categories", indices = [Index("parentUid")])
@@ -64,7 +68,7 @@ data class CategoryEntity(
 
 @Entity(
     tableName = "transactions",
-    indices = [Index("date"), Index("accountUid"), Index("toAccountUid"), Index("categoryUid"), Index("splitUid")],
+    indices = [Index("date"), Index("accountUid"), Index("toAccountUid"), Index("categoryUid"), Index("splitUid"), Index("externalId")],
 )
 data class TransactionEntity(
     @PrimaryKey val uid: String,
@@ -88,6 +92,8 @@ data class TransactionEntity(
     /** Parts of an operation split across categories share it; added in schema version 6. */
     val splitUid: String? = null,
     @ColumnInfo(defaultValue = "0") val splitIndex: Int = 0,
+    /** Bank id from an imported statement; added in schema version 8. */
+    val externalId: String? = null,
 )
 
 /** A card of a bank linked to an account; last4 null is the bank's fallback. Synced like other records. */

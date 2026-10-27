@@ -2,9 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- The app reads bank notifications, so it must not be able to send anything anywhere. Google's scanner
-         library asks for the network only for its usage telemetry; the scanner itself runs in Play services. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- "Доступ с компьютера" serves pages to the home Wi-Fi; Android needs INTERNET even for a local port.
+         Nothing in the app connects out. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Keeps the processor and Wi-Fi awake while access from a computer is on. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Google's scanner library wants the network for usage telemetry only; with INTERNET back, its uploader is
+         taken out so nothing is sent. The scanner itself runs in Play services. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
     <application
@@ -24,6 +31,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            tools:node="remove" />
+        <service
+            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+            tools:node="remove" />
+        <receiver
+            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+            tools:node="remove" />
+
+        <!-- The local web server; runs only while the user keeps "Доступ с компьютера" on. -->
+        <service
+            android:name=".web.WebAccessService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Web page for a computer on the same Wi-Fi to view and edit the family budget" />
+        </service>
 
         <!-- Bank pushes; enabled by the user in "Доступ к уведомлениям". -->
         <service

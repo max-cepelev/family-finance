@@ -15,9 +15,9 @@ fun AccountGroup.toEntity() = AccountGroupEntity(uid, name, sortOrder, archived,
 fun AccountGroupEntity.toDomain() = AccountGroup(uid, name, sortOrder, archived, updatedAt, deleted, deviceId)
 
 fun Account.toEntity() =
-    AccountEntity(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId)
+    AccountEntity(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId, isCredit, creditLimit, paymentDay)
 fun AccountEntity.toDomain() =
-    Account(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId)
+    Account(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId, isCredit, creditLimit, paymentDay)
 
 fun Category.toEntity() =
     CategoryEntity(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
@@ -26,11 +26,11 @@ fun CategoryEntity.toDomain() =
 
 fun Transaction.toEntity() = TransactionEntity(
     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-    categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex,
+    categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex, externalId,
 )
 fun TransactionEntity.toDomain() = Transaction(
     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
-    categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex,
+    categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex, externalId,
 )
 
 fun BankCard.toEntity() = BankCardEntity(uid, bank, last4, accountUid, updatedAt, deleted, deviceId)

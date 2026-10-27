@@ -82,7 +82,7 @@ interface TransactionDao {
     fun observeCategoryUsage(): Flow<List<UsageRow>>
 
     @Query(
-        "SELECT uid FROM transactions WHERE deleted = 0 AND source = 'push' AND categoryUid IS NULL " +
+        "SELECT uid FROM transactions WHERE deleted = 0 AND source IN ('push', 'statement') AND categoryUid IS NULL " +
             "AND type != 'TRANSFER' ORDER BY date DESC",
     )
     fun observeUncategorizedFromPush(): Flow<List<String>>
@@ -92,6 +92,18 @@ interface TransactionDao {
             "AND note = :note COLLATE NOCASE ORDER BY date DESC LIMIT 1",
     )
     suspend fun categoryForNote(type: TransactionType, note: String): String?
+
+    @Query("SELECT externalId FROM transactions WHERE deleted = 0 AND externalId IN (:ids)")
+    suspend fun knownExternalIds(ids: List<String>): List<String>
+
+    @Query(
+        "SELECT * FROM transactions WHERE deleted = 0 AND externalId IS NULL AND splitUid IS NULL AND accountUid = :accountUid " +
+            "AND type = :type AND amount = :amount AND date BETWEEN :from AND :to ORDER BY ABS(date - :at)",
+    )
+    suspend fun statementCandidates(accountUid: String, type: TransactionType, amount: Long, at: Long, from: Long, to: Long): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions WHERE deleted = 0 AND accountUid = :accountUid AND type = :type AND amount = :amount AND date BETWEEN :from AND :to")
+    suspend fun findSame(accountUid: String, type: TransactionType, amount: Long, from: Long, to: Long): List<TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE deleted = 0 AND splitUid = :splitUid ORDER BY splitIndex")
     suspend fun splitParts(splitUid: String): List<TransactionEntity>

@@ -22,8 +22,8 @@ android {
         applicationId = "com.familyfinance"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
     signingConfigs {
         if (keystoreProps.isNotEmpty()) {
@@ -88,6 +88,13 @@ dependencies {
 
     // Google's ready-made QR scanner screen; needs no camera permission.
     implementation(libs.play.services.code.scanner)
+
+    // "Доступ с компьютера": a web server inside the app, pages built in Kotlin, htmx for partial updates.
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.html.builder)
+    implementation(libs.htmx.webjar)
+    testImplementation(libs.ktor.server.test.host)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

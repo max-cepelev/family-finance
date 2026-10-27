@@ -36,9 +36,11 @@ import com.familyfinance.ui.account.AccountEditScreen
 import com.familyfinance.ui.account.AccountEditViewModel
 import com.familyfinance.ui.accounts.AccountsScreen
 import com.familyfinance.ui.banks.BanksScreen
+import com.familyfinance.ui.calendar.CalendarScreen
 import com.familyfinance.ui.categories.CategoriesScreen
 import com.familyfinance.ui.common.SheetHost
-import com.familyfinance.ui.calendar.CalendarScreen
+import com.familyfinance.ui.csv.CsvImportScreen
+import com.familyfinance.ui.csv.CsvImportViewModel
 import com.familyfinance.ui.more.MoreScreen
 import com.familyfinance.ui.stats.StatsScreen
 import com.familyfinance.ui.sync.SyncScreen
@@ -46,6 +48,7 @@ import com.familyfinance.ui.theme.FinanceColors
 import com.familyfinance.ui.transaction.EditTransactionScreen
 import com.familyfinance.ui.transaction.EditTransactionViewModel
 import com.familyfinance.ui.transactions.TransactionsScreen
+import com.familyfinance.ui.web.WebAccessScreen
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     Transactions("transactions", "Операции", Icons.AutoMirrored.Outlined.ReceiptLong),
@@ -61,6 +64,8 @@ private const val EDIT_ROUTE = "transaction?${EditTransactionViewModel.ARG_UID}=
 private const val SYNC_ROUTE = "sync"
 private const val CATEGORIES_ROUTE = "categories"
 private const val BANKS_ROUTE = "banks"
+private const val WEB_ROUTE = "web"
+private const val CSV_ROUTE = "csv?${CsvImportViewModel.ARG_URI}={${CsvImportViewModel.ARG_URI}}"
 private const val ACCOUNT_ROUTE = "account?${AccountEditViewModel.ARG_UID}={${AccountEditViewModel.ARG_UID}}"
 
 private fun accountRoute(uid: String?) =
@@ -157,10 +162,17 @@ fun MainScreen() {
                         onOpenSync = { navController.navigate(SYNC_ROUTE) },
                         onOpenCategories = { navController.navigate(CATEGORIES_ROUTE) },
                         onOpenBanks = { navController.navigate(BANKS_ROUTE) },
+                        onOpenWeb = { navController.navigate(WEB_ROUTE) },
+                        onOpenCsv = { uri -> navController.navigate("csv?${CsvImportViewModel.ARG_URI}=${Uri.encode(uri.toString())}") },
                     )
                 }
                 composable(CATEGORIES_ROUTE) { CategoriesScreen(onClose = { navController.popBackStack() }) }
                 composable(BANKS_ROUTE) { BanksScreen(onClose = { navController.popBackStack() }) }
+                composable(WEB_ROUTE) { WebAccessScreen(onClose = { navController.popBackStack() }) }
+                composable(
+                    CSV_ROUTE,
+                    arguments = listOf(navArgument(CsvImportViewModel.ARG_URI) { type = NavType.StringType; defaultValue = "" }),
+                ) { CsvImportScreen(onClose = { navController.popBackStack() }) }
                 composable(SYNC_ROUTE) { SyncScreen(onClose = { navController.popBackStack() }) }
                 composable(
                     EDIT_ROUTE,

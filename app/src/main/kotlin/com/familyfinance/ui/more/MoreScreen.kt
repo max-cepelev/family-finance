@@ -1,5 +1,7 @@
 package com.familyfinance.ui.more
 
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -23,28 +25,39 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Laptop
+import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.familyfinance.domain.csv.AppCsv
 import com.familyfinance.domain.importer.ImportResult
 import com.familyfinance.ui.common.ScreenTitle
 import com.familyfinance.ui.common.WhiteCard
 import com.familyfinance.ui.common.rememberNow
+import com.familyfinance.ui.csv.CsvExportSheet
 import com.familyfinance.ui.sync.SyncTexts
 import com.familyfinance.ui.sync.SyncUiState
 import com.familyfinance.ui.sync.SyncViewModel
@@ -55,6 +68,8 @@ fun MoreScreen(
     onOpenSync: () -> Unit,
     onOpenCategories: () -> Unit,
     onOpenBanks: () -> Unit,
+    onOpenCsv: (Uri) -> Unit,
+    onOpenWeb: () -> Unit,
     viewModel: ImportViewModel = hiltViewModel(),
     syncViewModel: SyncViewModel = hiltViewModel(),
 ) {
@@ -67,6 +82,11 @@ fun MoreScreen(
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.import(uri)
     }
+    val csvPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) onOpenCsv(uri)
+    }
+    var exporting by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(Modifier.fillMaxSize()) {
         ScreenTitle("Ещё")
@@ -120,23 +140,35 @@ fun MoreScreen(
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
             WhiteCard(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.fillMaxWidth()
-                        .clickable(enabled = state != ImportState.Running) { picker.launch(arrayOf("*/*")) }
-                        .heightIn(min = 64.dp)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(Icons.Outlined.FileDownload, contentDescription = null, tint = FinanceColors.Muted)
-                    Column(Modifier.weight(1f)) {
-                        Text("Импорт из Money Manager", style = MaterialTheme.typography.bodyLarge)
-                        Text("Файл бэкапа .mmbak: счета, категории и все операции", style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
-                    }
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted)
+                // Banks and Excel label CSV differently (text/csv, text/plain, octet-stream), so every file is offered.
+                DataRow(Icons.Outlined.FileUpload, "Импорт CSV", "Выписка банка или таблица в формате приложения") { csvPicker.launch(arrayOf("*/*")) }
+                HorizontalDivider(color = FinanceColors.Hairline)
+                DataRow(Icons.Outlined.FileDownload, "Экспорт в CSV", "Операции за период — для Excel или резервной копии") { exporting = true }
+                HorizontalDivider(color = FinanceColors.Hairline)
+                DataRow(Icons.Outlined.Laptop, "Доступ с компьютера", "Бюджет в браузере по домашней Wi-Fi", onClick = onOpenWeb)
+                HorizontalDivider(color = FinanceColors.Hairline)
+                DataRow(Icons.Outlined.TableChart, "Импорт из Money Manager", "Файл бэкапа .mmbak", enabled = state != ImportState.Running) {
+                    picker.launch(arrayOf("*/*"))
                 }
             }
+            Text(
+                "Формат приложения: ${AppCsv.HEADER.joinToString("; ")}. Экспорт пишет его же, так что файл можно поправить в Excel и загрузить обратно.",
+                style = MaterialTheme.typography.bodySmall,
+                color = FinanceColors.Muted,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.height(16.dp))
         }
+    }
+
+    if (exporting) {
+        CsvExportSheet(
+            onDone = { message ->
+                exporting = false
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            },
+            onDismiss = { exporting = false },
+        )
     }
 
     when (val s = state) {
@@ -205,6 +237,22 @@ private fun Line(label: String, applied: Int, received: Int) {
     Row(Modifier.fillMaxWidth()) {
         Text(label, Modifier.weight(1f))
         Text(if (applied == received) "$applied" else "$applied из $received")
+    }
+}
+
+@Composable
+private fun DataRow(icon: ImageVector, title: String, note: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = FinanceColors.Muted)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(note, style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted)
     }
 }
 

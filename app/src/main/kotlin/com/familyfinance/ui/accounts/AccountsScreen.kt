@@ -30,19 +30,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.familyfinance.domain.model.AccountWithBalance
+import com.familyfinance.domain.model.CreditCard
 import com.familyfinance.ui.common.Amount
 import com.familyfinance.ui.common.CardShape
 import com.familyfinance.ui.common.ColoredAmount
+import com.familyfinance.ui.common.Dates
 import com.familyfinance.ui.common.MoneyFormatter
 import com.familyfinance.ui.common.ScreenTitle
 import com.familyfinance.ui.common.WhiteCard
 import com.familyfinance.ui.theme.FinanceColors
+import java.time.LocalDate
 import kotlin.math.abs
 
 @Composable
@@ -93,6 +98,7 @@ fun AccountsScreen(
                     }
                     if (isOpen) {
                         HorizontalDivider(color = FinanceColors.Hairline)
+                        val today = LocalDate.now()
                         group.accounts.forEach { item ->
                             Row(
                                 Modifier.fillMaxWidth().clickable { onOpenAccount(item.account.uid) }
@@ -103,6 +109,9 @@ fun AccountsScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(item.account.name, style = MaterialTheme.typography.bodyLarge)
                                     if (item.account.hidden) Text("скрыт", style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
+                                    creditNote(item, today)?.let { (text, soon) ->
+                                        Text(text, style = MaterialTheme.typography.bodySmall, color = if (soon) PaymentSoon else FinanceColors.Muted)
+                                    }
                                 }
                                 Amount(item.balance, item.account.currencyCode)
                             }
@@ -112,6 +121,32 @@ fun AccountsScreen(
             }
         }
     }
+}
+
+/** Days before a payment when the card's line turns orange. */
+private const val PAYMENT_SOON_DAYS = 3
+private val PaymentSoon = Color(0xFFA0620F)
+
+/**
+ * "Доступно 39 184,58 ₽ · платёж 25 ноя" under a credit card; true when the payment is near and something is owed.
+ * Null for other accounts and for a card with neither a limit nor a payment day.
+ */
+private fun creditNote(item: AccountWithBalance, today: LocalDate): Pair<String, Boolean>? {
+    val account = item.account
+    if (!account.isCredit) return null
+    val available = account.creditLimit.takeIf { it > 0 }
+        ?.let { "Доступно ${MoneyFormatter.format(CreditCard.available(it, item.balance), account.currencyCode)}" }
+    val date = account.paymentDay?.let { CreditCard.nextPayment(it, today) }
+    val days = date?.let { CreditCard.daysUntil(it, today) }
+    val soon = days != null && days <= PAYMENT_SOON_DAYS && CreditCard.debt(item.balance) > 0
+    val payment = when {
+        date == null -> null
+        soon && days == 0L -> "платёж сегодня"
+        soon -> "платёж через ${Dates.days(days!!)}"
+        else -> "платёж ${Dates.dayMonthShort(date)}"
+    }
+    val text = listOfNotNull(available, payment).joinToString(" · ").ifEmpty { return null }
+    return text to soon
 }
 
 @Composable

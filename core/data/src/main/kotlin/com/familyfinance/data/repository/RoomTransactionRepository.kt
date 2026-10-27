@@ -46,6 +46,15 @@ class RoomTransactionRepository @Inject constructor(
         changes.record(deleted.toDomain())
     }
 
+    override suspend fun knownExternalIds(ids: List<String>): Set<String> =
+        ids.chunked(500).flatMap { dao.knownExternalIds(it) }.toSet()
+
+    override suspend fun statementCandidates(accountUid: String, type: TransactionType, amount: Long, at: Long, from: Long, to: Long): List<Transaction> =
+        dao.statementCandidates(accountUid, type, amount, at, from, to).map { it.toDomain() }
+
+    override suspend fun findSame(accountUid: String, type: TransactionType, amount: Long, from: Long, to: Long): List<Transaction> =
+        dao.findSame(accountUid, type, amount, from, to).map { it.toDomain() }
+
     override suspend fun splitParts(splitUid: String): List<Transaction> = dao.splitParts(splitUid).map { it.toDomain() }
 
     override suspend fun saveAll(transactions: List<Transaction>, deleteUids: List<String>) = db.withTransaction {

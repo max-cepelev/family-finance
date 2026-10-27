@@ -137,8 +137,10 @@ fun transactionRow(tx: Transaction, names: CategoryNames, accounts: Map<String, 
     val top = names.top(tx.categoryUid)
     val icon = names.get(tx.categoryUid)?.icon ?: top?.icon
     val fromPush = tx.source == Transaction.SOURCE_PUSH
+    // Operations the app added by itself, from a push or a statement, wait for a category to be checked.
+    val automatic = fromPush || tx.source == Transaction.SOURCE_STATEMENT
     return TransactionRowUi(
         tx.uid, tx.type, title, subtitle, tx.amount, tx.currencyCode, top?.name, top?.uid, icon,
-        fromPush = fromPush, hasReceipt = tx.receipt != null, needsCategory = fromPush && tx.categoryUid == null,
+        fromPush = fromPush, hasReceipt = tx.receipt != null, needsCategory = automatic && tx.categoryUid == null,
     )
 }

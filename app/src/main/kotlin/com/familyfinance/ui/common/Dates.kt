@@ -44,6 +44,9 @@ object Dates {
 
     private fun short(date: LocalDate) = "${date.dayOfMonth} ${SHORT_MONTHS[date.monthValue - 1]}"
 
+    /** "25 ноя". */
+    fun dayMonthShort(date: LocalDate): String = short(date)
+
     /** "18–24 янв 2021", "29 мар – 4 апр 2021", "28 дек 2020 – 3 янв 2021". Both days included. */
     fun range(from: LocalDate, to: LocalDate): String = when {
         from == to -> "${short(from)} ${from.year}"
@@ -75,6 +78,9 @@ object Dates {
     }
 
     fun operations(count: Int): String = plural(count, "операция", "операции", "операций")
+
+    /** "1 день", "3 дня", "5 дней". */
+    fun days(count: Long): String = plural(count.toInt(), "день", "дня", "дней")
 
     /** "только что", "5 минут назад", "сегодня в 14:32", "вчера в 9:05", "12 марта в 18:40". */
     fun ago(epochMillis: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {

@@ -17,6 +17,8 @@ sqliteJdbc = "3.47.1.0"
 robolectric = "4.14.1"
 androidxTestCore = "1.6.1"
 codeScanner = "16.1.0"
+ktor = "3.0.3"
+htmx = "2.0.4"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -46,6 +48,12 @@ junit = { module = "junit:junit", version.ref = "junit" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+# htmx as a WebJar: the script ships inside the APK as a Java resource, nothing is fetched at run time.
+htmx-webjar = { module = "org.webjars.npm:htmx.org", version.ref = "htmx" }
 play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "codeScanner" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 

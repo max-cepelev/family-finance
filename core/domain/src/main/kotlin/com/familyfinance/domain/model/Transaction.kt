@@ -35,9 +35,12 @@ data class Transaction(
     val splitUid: String? = null,
     /** Position of the part; 0 is the one that takes the remainder. */
     val splitIndex: Int = 0,
+    /** The bank's id of the operation from an imported statement ("raif:ZR00000002OS38IC"), so it is imported once. */
+    val externalId: String? = null,
 ) : Syncable {
     companion object {
         const val SOURCE_PUSH = "push"
         const val SOURCE_RECEIPT = "receipt"
+        const val SOURCE_STATEMENT = "statement"
     }
 }

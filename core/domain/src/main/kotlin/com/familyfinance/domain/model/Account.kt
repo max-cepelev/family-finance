@@ -22,6 +22,12 @@ data class Account(
     override val updatedAt: Long,
     override val deleted: Boolean = false,
     override val deviceId: String,
+    /** A credit card: its balance is a debt against [creditLimit]. See [CreditCard]. */
+    val isCredit: Boolean = false,
+    /** In the account currency, minor units; 0 when not given. */
+    val creditLimit: Long = 0,
+    /** Day of month the bank expects the payment, 1..31; null when not given. Shown only, nothing is reminded. */
+    val paymentDay: Int? = null,
 ) : Syncable
 
 data class AccountWithBalance(

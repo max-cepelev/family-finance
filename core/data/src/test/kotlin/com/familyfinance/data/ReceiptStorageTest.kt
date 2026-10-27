@@ -85,6 +85,20 @@ class ReceiptStorageTest {
         assertTrue(transactions.get("b")!!.deleted)
     }
 
+        @Test fun `statement lines find their push twin once and are imported once`() = runTest {
+        transactions.save(expense("push", 39297, at + minute).copy(accountUid = "acc"))
+        transactions.save(expense("other-account", 39297, at).copy(accountUid = "cash"))
+        val found = transactions.statementCandidates("acc", TransactionType.EXPENSE, 39297, at, at - 15 * minute, at + 15 * minute)
+        assertEquals(listOf("push"), found.map { it.uid })
+
+        transactions.save(transactions.get("push")!!.copy(externalId = "raif:ZR01"))
+        assertEquals(setOf("raif:ZR01"), transactions.knownExternalIds(listOf("raif:ZR01", "raif:ZR02")))
+        // Marked as imported: not offered as a twin for another line.
+        assertEquals(emptyList<String>(), transactions.statementCandidates("acc", TransactionType.EXPENSE, 39297, at, at - 15 * minute, at + 15 * minute).map { it.uid })
+        // A file brought back finds it whatever its origin.
+        assertEquals(listOf("push"), transactions.findSame("acc", TransactionType.EXPENSE, 39297, at + minute, at + minute + 59_999).map { it.uid })
+    }
+
         @Test fun `deleted operation releases its receipt`() = runTest {
         transactions.save(expense("tx", 39297, at).copy(receipt = receipt))
         transactions.delete("tx")

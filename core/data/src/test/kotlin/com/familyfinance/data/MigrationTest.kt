@@ -62,6 +62,45 @@ class MigrationTest {
         db.close()
     }
 
+    @Test fun `version 6 accounts are not credit cards`() = runTest {
+        helper.createDatabase(NAME, 6).apply {
+            execSQL(
+                "INSERT INTO accounts (uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId) " +
+                    "VALUES ('acc', NULL, 'Кредитка Сбер', 'RUB', 1, 0, '', 5, 0, 'me')",
+            )
+            close()
+        }
+        helper.runMigrationsAndValidate(NAME, 7, true).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), FinanceDatabase::class.java, NAME)
+            .allowMainThreadQueries().build()
+        val account = db.syncDao().accounts(listOf("acc")).single()
+        assertEquals("Кредитка Сбер", account.name)
+        assertEquals(false, account.isCredit)
+        assertEquals(0L, account.creditLimit)
+        assertNull(account.paymentDay)
+        db.close()
+    }
+
+    @Test fun `version 7 operations have no statement id`() = runTest {
+        helper.createDatabase(NAME, 7).apply {
+            execSQL(
+                "INSERT INTO transactions (uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, " +
+                    "toAccountAmount, categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex) " +
+                    "VALUES ('tx', 'EXPENSE', 1, 39297, 'RUB', 'acc', 39297, NULL, NULL, 'food', 'Magnit', 5, 0, 'me', 'push', NULL, NULL, 0)",
+            )
+            close()
+        }
+        helper.runMigrationsAndValidate(NAME, 8, true).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), FinanceDatabase::class.java, NAME)
+            .allowMainThreadQueries().build()
+        val tx = db.transactionDao().get("tx")!!
+        assertEquals("push", tx.source)
+        assertNull(tx.externalId)
+        db.close()
+    }
+
     private companion object {
         const val NAME = "migration-test"
     }

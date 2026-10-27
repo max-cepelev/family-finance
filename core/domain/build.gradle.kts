@@ -28,5 +28,7 @@ tasks.test {
     // Optional end-to-end check against a real Money Manager backup:
     // ./gradlew :core:domain:test -Pmmbak.path=/path/to/backup.mmbak
     systemProperty("mmbak.path", findProperty("mmbak.path") ?: System.getenv("MMBAK_PATH") ?: "")
+    // ./gradlew :core:domain:test -Pstatement.path=/path/to/statement.csv
+    systemProperty("statement.path", findProperty("statement.path") ?: "")
     testLogging { events("passed", "skipped", "failed"); showStandardStreams = true }
 }

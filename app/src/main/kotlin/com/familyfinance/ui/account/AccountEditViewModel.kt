@@ -31,6 +31,10 @@ data class AccountForm(
     val hidden: Boolean = false,
     /** New account only: typed opening balance. */
     val openingBalance: String = "",
+    val isCredit: Boolean = false,
+    /** Credit limit as typed. */
+    val creditLimit: String = "",
+    val paymentDay: Int? = null,
 )
 
 data class AccountEditUiState(
@@ -90,7 +94,12 @@ class AccountEditViewModel @Inject constructor(
             stored = existing
             form.value = if (existing != null) {
                 operations.value = accounts.countTransactions(existing.uid)
-                AccountForm(existing.name, existing.groupUid, existing.currencyCode, existing.note, existing.hidden)
+                AccountForm(
+                    existing.name, existing.groupUid, existing.currencyCode, existing.note, existing.hidden,
+                    isCredit = existing.isCredit,
+                    creditLimit = if (existing.creditLimit > 0) TransactionDraft.format(existing.creditLimit, 2) else "",
+                    paymentDay = existing.paymentDay,
+                )
             } else {
                 val main = accounts.observeCurrencies().first().firstOrNull { it.isMain }?.code ?: "RUB"
                 AccountForm(currencyCode = main)
@@ -108,6 +117,9 @@ class AccountEditViewModel @Inject constructor(
     fun pickGroup(uid: String) = edit { it.copy(groupUid = uid) }
     fun pickCurrency(code: String) = edit { it.copy(currencyCode = code) }
     fun setOpeningBalance(value: String) = edit { it.copy(openingBalance = value) }
+    fun setCredit(value: Boolean) = edit { it.copy(isCredit = value) }
+    fun setCreditLimit(value: String) = edit { it.copy(creditLimit = value) }
+    fun pickPaymentDay(day: Int?) = edit { it.copy(paymentDay = day) }
 
     fun createGroup(name: String) {
         val trimmed = name.trim().ifEmpty { return }
@@ -149,7 +161,12 @@ class AccountEditViewModel @Inject constructor(
             }
             val order = stored?.sortOrder ?: ((accounts.observeAccounts().first().maxOfOrNull { it.sortOrder } ?: 0) + 1)
             val account = (stored ?: Account(UUID.randomUUID().toString(), null, "", f.currencyCode, order, updatedAt = 0, deviceId = ""))
-                .copy(name = f.name.trim(), groupUid = f.groupUid, currencyCode = f.currencyCode, note = f.note.trim(), hidden = f.hidden)
+                .copy(
+                    name = f.name.trim(), groupUid = f.groupUid, currencyCode = f.currencyCode, note = f.note.trim(), hidden = f.hidden,
+                    isCredit = f.isCredit,
+                    creditLimit = TransactionDraft.parseAmount(f.creditLimit, 2)?.coerceAtLeast(0) ?: 0,
+                    paymentDay = f.paymentDay,
+                )
             accounts.saveAccount(account)
             if (stored == null) {
                 TransactionDraft.parseAmount(f.openingBalance, 2)?.let { opening ->

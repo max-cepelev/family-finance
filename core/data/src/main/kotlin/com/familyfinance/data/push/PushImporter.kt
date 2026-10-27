@@ -68,6 +68,16 @@ class PushImporter @Inject constructor(
         return PushResult.Recorded(transaction, route.unknownCard)
     }
 
+    /**
+     * A notification still in the shade when the listener connects, possibly recorded before. One that went through
+     * [handle] is skipped as a repeat; one older than the seen marks are kept is skipped too, as it could no longer
+     * be told apart from a new one.
+     */
+    suspend fun handleMissed(bank: Bank, title: String?, text: String?, postedAt: Long, now: Long = System.currentTimeMillis()): PushResult {
+        if (now - postedAt > SEEN_KEEP_MS) return PushResult.Ignored
+        return handle(bank, title, text, postedAt)
+    }
+
     private fun dedupeKey(event: BankEvent, postedAt: Long): String {
         val raw = listOf(event.bank.code, event.income, event.amount, event.card, event.payee, postedAt / MINUTE_MS).joinToString("|")
         return MessageDigest.getInstance("SHA-256").digest(raw.toByteArray()).joinToString("") { "%02x".format(it) }

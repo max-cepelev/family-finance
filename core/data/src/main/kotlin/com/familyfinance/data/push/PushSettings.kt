@@ -16,8 +16,16 @@ class PushSettings @Inject constructor(@ApplicationContext private val context: 
     private val _enabled = MutableStateFlow(prefs.getBoolean(KEY_ENABLED, false))
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
 
+    /**
+     * When reading was last switched on, epoch millis; 0 when not known (switched on before this was kept).
+     * Pushes from before it came while the user did not want them, so catching up leaves them alone.
+     */
+    val enabledSince: Long get() = prefs.getLong(KEY_ENABLED_SINCE, 0L)
+
     fun setEnabled(value: Boolean) {
-        prefs.edit().putBoolean(KEY_ENABLED, value).apply()
+        val edit = prefs.edit().putBoolean(KEY_ENABLED, value)
+        if (value && !_enabled.value) edit.putLong(KEY_ENABLED_SINCE, System.currentTimeMillis())
+        edit.apply()
         _enabled.value = value
     }
 
@@ -26,5 +34,6 @@ class PushSettings @Inject constructor(@ApplicationContext private val context: 
 
     private companion object {
         const val KEY_ENABLED = "enabled"
+        const val KEY_ENABLED_SINCE = "enabled_since"
     }
 }

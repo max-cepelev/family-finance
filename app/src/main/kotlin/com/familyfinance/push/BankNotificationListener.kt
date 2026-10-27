@@ -23,8 +23,22 @@ class BankNotificationListener : NotificationListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    override fun onNotificationPosted(sbn: StatusBarNotification) {
+    override fun onNotificationPosted(sbn: StatusBarNotification) = read(sbn, missed = false)
+
+    /**
+     * Pushes that came while the listener was off (a reboot, an update, a force stop, a sleeping app) are still in
+     * the shade unless swiped away; read them now. Ones recorded before are skipped as repeats, and ones from before
+     * reading was switched on are left alone.
+     */
+    override fun onListenerConnected() {
+        val shade = runCatching { activeNotifications }.getOrNull() ?: return
+        shade.forEach { read(it, missed = true) }
+    }
+
+    private fun read(sbn: StatusBarNotification, missed: Boolean) {
         if (!settings.enabled.value) return
+        // Left in the shade from while reading was off: the user did not want those.
+        if (missed && sbn.postTime < settings.enabledSince) return
         val notification = sbn.notification ?: return
         // "У вас 2 уведомления от …" group summaries carry no operation.
         if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
@@ -39,7 +53,9 @@ class BankNotificationListener : NotificationListenerService() {
             title = title?.substringAfter("] ")
         }
         bank ?: return
-        scope.launch { importer.handle(bank, title, text, sbn.postTime) }
+        scope.launch {
+            if (missed) importer.handleMissed(bank, title, text, sbn.postTime) else importer.handle(bank, title, text, sbn.postTime)
+        }
     }
 
     override fun onDestroy() {

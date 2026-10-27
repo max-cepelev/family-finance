@@ -72,6 +72,18 @@ class PushImporterTest {
         assertEquals(TransactionType.INCOME, wife.transaction.type)
     }
 
+    @Test fun `pushes left in the shade are caught up once`() = runTest {
+        importer.handle(Bank.SBER, "➖ 120 ₽ Пятёрочка", "💳 900 ₽ •• 2824", now) as PushResult.Recorded
+        // The listener reconnects and finds the same notifications in the shade, plus one it missed.
+        assertEquals(PushResult.Duplicate, importer.handleMissed(Bank.SBER, "➖ 120 ₽ Пятёрочка", "💳 900 ₽ •• 2824", now, now = now + HOUR_MS))
+        val missed = importer.handleMissed(Bank.SBER, "➖ 45 ₽ Метро", "💳 855 ₽ •• 2824", now + MINUTE_MS, now = now + HOUR_MS)
+        assertEquals(4500L, (missed as PushResult.Recorded).transaction.amount)
+        // Older than the seen marks are kept: it may have been recorded and forgotten, so it is left alone.
+        val stale = now - 8 * 24 * HOUR_MS
+        assertEquals(PushResult.Ignored, importer.handleMissed(Bank.SBER, "➖ 300 ₽ Лента", "💳 555 ₽ •• 2824", stale, now = now))
+        assertEquals(2, transactions.observeCount().first())
+    }
+
     @Test fun `unknown card goes to the fallback and asks to be linked`() = runTest {
         val r = importer.handle(Bank.SBER, "➖ 10 ₽ Райффайзенбанк", "💳 0 ₽ •• 7777", now) as PushResult.Recorded
         assertEquals("sber-default", r.transaction.accountUid)
@@ -88,5 +100,10 @@ class PushImporterTest {
         assertEquals(PushResult.Ignored, importer.handle(Bank.TBANK, "Т-Банк", "Никому не говорите код 2286!", now))
         assertTrue(importer.handle(Bank.RAIF, "Заплатили картой *5790", "- 17.00 ₽ в MARMALATO 086. Теперь на карте 14 025.10 ₽", now) is PushResult.NoAccount)
         assertEquals(0, db.transactionDao().observeCount().first())
+    }
+
+    private companion object {
+        const val MINUTE_MS = 60_000L
+        const val HOUR_MS = 60 * MINUTE_MS
     }
 }

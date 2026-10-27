@@ -20,6 +20,7 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import io.ktor.util.toMap
 import java.net.InetAddress
 import java.time.YearMonth
 import kotlinx.html.div
@@ -35,7 +36,7 @@ private const val HTMX = "META-INF/resources/webjars/htmx.org/2.0.4/dist/htmx.mi
  * The pages of "Доступ с компьютера". [device] names the phone in the page footer.
  * Only browsers from the local network get an answer, and only after the code from the phone.
  */
-fun Application.webApp(sessions: WebSessions, data: WebData, device: String) {
+fun Application.webApp(sessions: WebSessions, data: WebData, edits: WebEdits, device: String) {
     intercept(ApplicationCallPipeline.Plugins) {
         // The actual peer, not a header it could fake: the home network or this phone itself (adb, its own browser).
         val peer = runCatching { InetAddress.getByName(call.request.local.remoteAddress) }.getOrNull()
@@ -47,6 +48,7 @@ fun Application.webApp(sessions: WebSessions, data: WebData, device: String) {
     routing {
         get("/static/htmx.min.js") { call.resource(HTMX, ContentType.Application.JavaScript) }
         get("/static/app.css") { call.resource("web/app.css", ContentType.Text.CSS) }
+        get("/static/app.js") { call.resource("web/app.js", ContentType.Application.JavaScript) }
 
         get("/login") { call.respondHtml { login(error = false) } }
         post("/login") {
@@ -74,7 +76,35 @@ fun Application.webApp(sessions: WebSessions, data: WebData, device: String) {
             // The search box picks #list out of this (hx-select).
             call.respondText(createHTML().div { list(page) }, ContentType.Text.Html)
         }
+
+        // The edit panel. Each answer is the whole panel, swapped in for #panel.
+        get("/ops/edit") {
+            if (!call.signedIn(sessions)) return@get
+            val form = edits.open(call.request.queryParameters["uid"]?.ifEmpty { null }, call.month())
+            call.respondText(WebPanel.panel(form, focus = true), ContentType.Text.Html)
+        }
+        post("/ops/form") {
+            if (!call.signedIn(sessions)) return@post
+            val fields = call.receiveParameters()
+            call.respondText(WebPanel.panel(edits.change(fields.toMap(), fields["action"])), ContentType.Text.Html)
+        }
+        post("/ops/save") {
+            if (!call.signedIn(sessions)) return@post
+            val form = edits.save(call.receiveParameters().toMap())
+            if (form == null) call.closePanel() else call.respondText(WebPanel.panel(form), ContentType.Text.Html)
+        }
+        post("/ops/delete") {
+            if (!call.signedIn(sessions)) return@post
+            call.receiveParameters()["uid"]?.ifEmpty { null }?.let { edits.delete(it) }
+            call.closePanel()
+        }
     }
+}
+
+/** Closes the panel and tells the list to reload (it listens for `ops-changed`). */
+private suspend fun ApplicationCall.closePanel() {
+    response.headers.append("HX-Trigger", "ops-changed")
+    respondText(WebPanel.closed(), ContentType.Text.Html)
 }
 
 /** False, with the browser sent to the code page, when there is no valid session. */

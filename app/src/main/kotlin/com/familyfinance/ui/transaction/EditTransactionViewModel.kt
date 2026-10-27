@@ -321,29 +321,14 @@ class EditTransactionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Writes the operation, as parts when split. A split that went back to one part, or parts that were removed,
-     * leave deletions behind. False when the parts do not add up, with the error shown.
-     */
+    /** Writes the operation, as parts when split. False when the parts do not add up, with the error shown. */
     private suspend fun saveParts(d: TransactionDraft, whole: Transaction): Boolean {
-        val currency = whole.currencyCode
-        val decimals = decimalsOf(currencies.value)(currency)
-        val written = if (d.isSplit) {
-            val parts = d.parts.mapIndexed { i, p ->
-                Split.Part(p.categoryUid, if (i == 0) 0 else TransactionDraft.parseAmount(p.amountText, decimals) ?: 0)
-            }
-            when (val result = Split.build(whole, parts, d.partUids) { java.util.UUID.randomUUID().toString() }) {
-                is Split.Result.Valid -> result.transactions
-                else -> {
-                    progress.update { it.copy(errors = it.errors + DraftError.SPLIT) }
-                    return false
-                }
-            }
-        } else {
-            val single = d.parts.singleOrNull()?.let { whole.copy(categoryUid = it.categoryUid) } ?: whole
-            listOf(single.copy(splitUid = null, splitIndex = 0))
+        val writes = d.writes(whole, decimalsOf(currencies.value)(whole.currencyCode))
+        if (writes == null) {
+            progress.update { it.copy(errors = it.errors + DraftError.SPLIT) }
+            return false
         }
-        transactions.saveAll(written, deleteUids = d.partUids - written.map { it.uid }.toSet())
+        transactions.saveAll(writes.save, deleteUids = writes.delete)
         return true
     }
 

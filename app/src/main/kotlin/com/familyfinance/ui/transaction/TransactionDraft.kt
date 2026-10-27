@@ -2,6 +2,7 @@ package com.familyfinance.ui.transaction
 
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.Money
+import com.familyfinance.domain.model.Split
 import com.familyfinance.domain.model.Transaction
 import com.familyfinance.domain.model.TransactionType
 import java.math.BigDecimal
@@ -95,6 +96,27 @@ data class TransactionDraft(
                 receipt = receipt,
             ),
         )
+    }
+
+    /** What saving writes: the operation or its parts, and the stored parts that are gone. */
+    data class Writes(val save: List<Transaction>, val delete: List<String>)
+
+    /**
+     * [whole] as it is written: as parts when split, as one operation otherwise. A split that went back to one part,
+     * or parts that were removed, leave deletions behind. Null when the parts do not add up.
+     */
+    fun writes(whole: Transaction, decimals: Int, newUid: () -> String = { UUID.randomUUID().toString() }): Writes? {
+        val written = if (isSplit) {
+            val split = parts.mapIndexed { i, p -> Split.Part(p.categoryUid, if (i == 0) 0 else parseAmount(p.amountText, decimals) ?: 0) }
+            when (val result = Split.build(whole, split, partUids, newUid)) {
+                is Split.Result.Valid -> result.transactions
+                else -> return null
+            }
+        } else {
+            val single = parts.singleOrNull()?.let { whole.copy(categoryUid = it.categoryUid) } ?: whole
+            listOf(single.copy(splitUid = null, splitIndex = 0))
+        }
+        return Writes(written, partUids - written.map { it.uid }.toSet())
     }
 
     /**

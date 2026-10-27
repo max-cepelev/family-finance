@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.first
 
 /** One operation as the web page shows it: every field already a string. */
 data class WebRow(
+    /** What the edit panel opens: the operation, or the first part of a split one. */
+    val uid: String,
     /** Emoji or first letter of the category. */
     val icon: String,
     val category: String,
@@ -121,6 +123,7 @@ object WebMonths {
             "выписка".takeIf { tx.source == Transaction.SOURCE_STATEMENT },
         )
         return WebRow(
+            uid = parts[0].uid,
             icon = icon,
             category = category,
             note = tx.note,

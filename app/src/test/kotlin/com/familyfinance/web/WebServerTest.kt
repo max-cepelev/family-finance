@@ -7,6 +7,7 @@ import com.familyfinance.domain.model.MainCurrency
 import com.familyfinance.domain.model.Transaction
 import com.familyfinance.domain.model.TransactionType
 import com.familyfinance.ui.common.MoneyFormatter
+import com.familyfinance.ui.transaction.DraftError
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -20,6 +21,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,16 +35,33 @@ class WebServerTest {
     private val data = object : WebData {
         override suspend fun month(month: YearMonth, query: String): WebMonth {
             val rows = listOf(
-                WebRow("🛒", "Питание › Продукты", "Лента", listOf("чек"), "Сбербанк", "1 254,30 ₽", TransactionType.EXPENSE),
-                WebRow("☕", "Питание › Кафе", "Шоколадница", emptyList(), "Т-Банк", "68,00 ₽", TransactionType.EXPENSE),
+                WebRow("t-1", "🛒", "Питание › Продукты", "Лента", listOf("чек"), "Сбербанк", "1 254,30 ₽", TransactionType.EXPENSE),
+                WebRow("t-2", "☕", "Питание › Кафе", "Шоколадница", emptyList(), "Т-Банк", "68,00 ₽", TransactionType.EXPENSE),
             ).filter { query.isEmpty() || query.lowercase() in (it.note + it.category).lowercase() }
             return WebMonth(month, "Октябрь 2026", "0,00 ₽", "1 322,30 ₽", "-1 322,30 ₽", listOf(WebDay(26, "понедельник", "1 322,30 ₽", true, rows)))
         }
     }
 
+    /** Remembers what was saved; an empty amount is the one error it knows. */
+    private class FakeEdits : WebEdits {
+        val saved = mutableListOf<WebFields>()
+        val deleted = mutableListOf<String>()
+        private fun form(uid: String?, errors: Set<DraftError> = emptySet()) = WebForm(
+            uid = uid, month = YearMonth.of(2026, 10), type = TransactionType.EXPENSE, amount = "1254,3", currency = "₽",
+            date = "2026-10-26", time = "14:42", account = "a", toAccount = "", toAmount = null, toCurrency = "",
+            category = "", note = "Лента", accounts = listOf(WebOption("a", "Сбербанк")), categories = listOf(WebOption("", "Без категории")),
+            parts = emptyList(), remainder = "", receipt = null, errors = errors,
+        )
+        override suspend fun open(uid: String?, month: YearMonth) = form(uid)
+        override suspend fun change(fields: WebFields, action: String?) = form(fields["uid"]?.firstOrNull())
+        override suspend fun save(fields: WebFields): WebForm? =
+            if (fields["amount"]?.firstOrNull().isNullOrEmpty()) form(null, setOf(DraftError.AMOUNT)) else null.also { saved += fields }
+        override suspend fun delete(uid: String) { deleted += uid }
+    }
+
     @Test fun `pages need the code from the phone`() = testApplication {
         val sessions = FakeSessions()
-        application { webApp(sessions, data, "Galaxy · 192.168.1.23") }
+        application { webApp(sessions, data, FakeEdits(), "Galaxy · 192.168.1.23") }
         val client = createClient { followRedirects = false }
 
         val anonymous = client.get("/ops")
@@ -64,7 +83,7 @@ class WebServerTest {
 
     @Test fun `operations page and search`() = testApplication {
         val sessions = FakeSessions().apply { tokens += "t1" }
-        application { webApp(sessions, data, "Galaxy · 192.168.1.23") }
+        application { webApp(sessions, data, FakeEdits(), "Galaxy · 192.168.1.23") }
 
         val page = client.get("/ops?month=2026-10") { header(HttpHeaders.Cookie, "ff_session=t1") }.bodyAsText()
         assertTrue(page.contains("Октябрь 2026"))
@@ -76,6 +95,40 @@ class WebServerTest {
         assertTrue(found.contains("id=\"list\""))
         assertTrue(found.contains("Шоколадница"))
         assertFalse(found.contains("Лента"))
+    }
+
+    @Test fun `edit panel saves and tells the list to reload`() = testApplication {
+        val sessions = FakeSessions().apply { tokens += "t1" }
+        val edits = FakeEdits()
+        application { webApp(sessions, data, edits, "") }
+        val cookie = "ff_session=t1"
+
+        val page = client.get("/ops?month=2026-10") { header(HttpHeaders.Cookie, cookie) }.bodyAsText()
+        assertTrue(page.contains("hx-get=\"/ops/edit?uid=t-1&amp;month=2026-10\""))
+        assertTrue(page.contains("hx-trigger=\"ops-changed from:body\""))
+        // Rows sit inside the list; inheriting its hx-select would swap nothing in and lose the panel slot.
+        assertTrue(page.contains("hx-disinherit=\"*\""))
+
+        val panel = client.get("/ops/edit?uid=t-1&month=2026-10") { header(HttpHeaders.Cookie, cookie) }.bodyAsText()
+        assertTrue(panel.startsWith("<aside class=\"panel\" id=\"panel\">"))
+        assertTrue(panel.contains("value=\"Лента\""))
+
+        val invalid = client.submitForm("/ops/save", parameters { append("uid", "t-1"); append("amount", "") }) { header(HttpHeaders.Cookie, cookie) }
+        assertTrue(invalid.bodyAsText().contains("Введите сумму"))
+        assertNull(invalid.headers["HX-Trigger"])
+
+        val saved = client.submitForm("/ops/save", parameters { append("uid", "t-1"); append("amount", "45") }) { header(HttpHeaders.Cookie, cookie) }
+        assertEquals("ops-changed", saved.headers["HX-Trigger"])
+        assertEquals("<aside id=\"panel\"></aside>", saved.bodyAsText().trim())
+        assertEquals(listOf("45"), edits.saved.single()["amount"])
+
+        val deleted = client.submitForm("/ops/delete", parameters { append("uid", "t-1") }) { header(HttpHeaders.Cookie, cookie) }
+        assertEquals("ops-changed", deleted.headers["HX-Trigger"])
+        assertEquals(listOf("t-1"), edits.deleted)
+
+        // Without the code nothing is written.
+        client.submitForm("/ops/delete", parameters { append("uid", "t-2") })
+        assertEquals(listOf("t-1"), edits.deleted)
     }
 
     @Test fun `search totals cover only the rows found`() {
@@ -109,9 +162,10 @@ class WebServerTest {
     }
 
     @Test fun `script and styles ship inside the app`() = testApplication {
-        application { webApp(FakeSessions(), data, "") }
+        application { webApp(FakeSessions(), data, FakeEdits(), "") }
         assertTrue(client.get("/static/htmx.min.js").bodyAsText().contains("htmx"))
         assertTrue(client.get("/static/app.css").bodyAsText().contains("--primary"))
+        assertTrue(client.get("/static/app.js").bodyAsText().contains("closePanel"))
     }
 
     @Test fun `browser names from user agents`() {

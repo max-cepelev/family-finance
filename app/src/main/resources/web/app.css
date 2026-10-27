@@ -31,13 +31,14 @@ button.primary { height: 44px; padding: 0 22px; border: 0; border-radius: 22px; 
 .nav.soon { color: #A3A9A1; cursor: default; }
 .device { margin-top: auto; padding: 0 8px; font-size: 12px; color: var(--muted); }
 
-.content { flex: 1; min-width: 0; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; max-width: 1100px; }
+.content { flex: 1; min-width: 0; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; max-width: 1400px; }
 .toolbar { display: flex; align-items: center; gap: 8px; }
 .toolbar h1 { margin: 0; font-size: 22px; font-weight: 500; min-width: 170px; text-align: center; }
 .arrow { width: 32px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
 .arrow:hover { background: var(--hair); }
 .spacer { flex: 1; }
 .search { height: 36px; width: 260px; border-radius: 18px; border: 1px solid var(--hair); padding: 0 14px; font: inherit; background: var(--card); }
+#list { display: flex; flex-direction: column; gap: 14px; }
 .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .total { padding: 12px 16px; display: flex; flex-direction: column; gap: 2px; }
 .total .label { font-size: 12px; color: var(--muted); }
@@ -59,3 +60,45 @@ button.primary { height: 44px; padding: 0 22px; border: 0; border-radius: 22px; 
 .tag { margin-left: 6px; padding: 1px 7px; border-radius: 8px; background: var(--soft); color: var(--on-soft); font-size: 11px; }
 .account { font-size: 13px; color: var(--muted); }
 .amount { text-align: right; }
+.row[data-uid] { cursor: pointer; }
+.row[data-uid]:hover { background: #F7F9F6; }
+.row.selected { background: #EEF4EF; }
+button.small { height: 36px; padding: 0 16px; border-radius: 18px; }
+
+/* Edit panel beside the list. */
+#panel:empty { display: none; }
+.panel { width: 360px; flex: none; position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--card); border-left: 1px solid var(--hair); box-shadow: -4px 0 16px rgba(27,31,28,.05); }
+.edit { min-height: 100%; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.panel-head { display: flex; align-items: center; }
+.panel-head .title { flex: 1; font-size: 18px; font-weight: 500; }
+.close { width: 32px; height: 32px; border: 0; border-radius: 16px; background: none; font-size: 22px; color: var(--muted); cursor: pointer; }
+.close:hover { background: var(--row); }
+.seg { background: #E9ECE6; border-radius: 14px; padding: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.seg button { padding: 7px 0; border: 0; border-radius: 10px; background: none; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--card); font-weight: 500; color: var(--ink); }
+.seg button.on.income { color: var(--income); }
+.seg button.on.expense { color: var(--expense); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field .label { font-size: 12px; color: var(--muted); }
+.field input, .field select { height: 40px; border-radius: 12px; border: 1px solid #C5CBC2; background: var(--card); padding: 0 12px; font: inherit; color: inherit; width: 100%; min-width: 0; }
+.field input:focus, .field select:focus { outline: none; border-color: var(--primary); }
+.field .error { font-size: 12px; color: var(--expense); }
+.money { position: relative; }
+.money .sum { font-size: 18px; font-weight: 500; padding-right: 36px; }
+.money .unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.pair { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+.link { align-self: flex-start; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12px; color: var(--primary); cursor: pointer; }
+.part { display: grid; grid-template-columns: minmax(0, 1fr) 96px 24px; gap: 6px; align-items: center; }
+.part .remainder { text-align: right; padding-right: 12px; color: var(--muted); }
+.remove { border: 0; background: none; font-size: 18px; color: var(--muted); cursor: pointer; }
+.hint { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.actions { margin-top: auto; display: flex; align-items: center; gap: 10px; }
+.danger { height: 44px; padding: 0 16px; border: 0; border-radius: 22px; background: none; color: var(--expense); font: inherit; font-weight: 500; cursor: pointer; }
+.danger:hover { background: #FBEDEC; }
+
+/* Narrow window: list and panel side by side would squeeze the toolbar under the panel, so the panel goes over it. */
+@media (max-width: 1199px) {
+  .panel { position: fixed; top: 0; right: 0; z-index: 10; box-shadow: -8px 0 24px rgba(27,31,28,.12); }
+}
+.search { min-width: 140px; flex-shrink: 1; }
+.toolbar > button { flex: none; }

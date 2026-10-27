@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 class WebAccessService : Service() {
     @Inject lateinit var access: WebAccess
     @Inject lateinit var data: RepositoryWebData
+    @Inject lateinit var edits: RepositoryWebEdits
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var server: EmbeddedServer<*, *>? = null
@@ -62,7 +63,7 @@ class WebAccessService : Service() {
         val device = listOfNotNull(Build.MODEL, WebAccess.wifiAddress()?.hostAddress).joinToString(" · ")
         for (port in WebAccess.PORT until WebAccess.PORT + PORTS_TO_TRY) {
             try {
-                server = embeddedServer(CIO, port = port, host = "0.0.0.0") { webApp(access, data, device) }.start(wait = false)
+                server = embeddedServer(CIO, port = port, host = "0.0.0.0") { webApp(access, data, edits, device) }.start(wait = false)
                 access.onStarted(port)
                 stayAwake()
                 watchIdle()

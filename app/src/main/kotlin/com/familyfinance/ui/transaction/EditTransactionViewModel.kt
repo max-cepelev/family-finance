@@ -108,6 +108,8 @@ class EditTransactionViewModel @Inject constructor(
     /** A new operation from a scanned receipt; known before anything loads, so the screen can lay out for it. */
     /** A new operation started from an account's screen is on that account. */
     private val presetAccount: String? = savedState.get<String>(ARG_ACCOUNT)?.takeIf { it.isNotEmpty() }
+    /** And one started from a category's screen is in that category. */
+    private val presetCategory: String? = savedState.get<String>(ARG_CATEGORY)?.takeIf { it.isNotEmpty() }
     private val scanned: ReceiptQr? = savedState.get<String>(ARG_RECEIPT)?.let(ReceiptQr::parse)?.takeIf { uid == null }
     val fromReceipt: Boolean get() = scanned != null
     private val registerKnown = MutableStateFlow(false)
@@ -191,7 +193,14 @@ class EditTransactionViewModel @Inject constructor(
             } else if (scanned != null) {
                 draftFrom(scanned)
             } else {
-                TransactionDraft(date = System.currentTimeMillis(), accountUid = presetAccount ?: transactions.lastUsedAccountUid())
+                // The held list starts empty; read the stored categories themselves.
+                val category = presetCategory?.let { uid -> categoryRepository.observeAll().first().firstOrNull { it.uid == uid } }
+                TransactionDraft(
+                    date = System.currentTimeMillis(),
+                    accountUid = presetAccount ?: transactions.lastUsedAccountUid(),
+                    type = if (category?.type == CategoryType.INCOME) TransactionType.INCOME else TransactionType.EXPENSE,
+                    categoryUid = category?.uid,
+                )
             }
             draft.value = initial
             loadFrequent(initial.type)
@@ -396,6 +405,7 @@ class EditTransactionViewModel @Inject constructor(
         const val ARG_UID = "uid"
         const val ARG_RECEIPT = "receipt"
         const val ARG_ACCOUNT = "account"
+        const val ARG_CATEGORY = "category"
         private val TIME = java.time.format.DateTimeFormatter.ofPattern("H:mm")
         private val DATE_TIME = java.time.format.DateTimeFormatter.ofPattern("d.MM.yyyy H:mm")
         private const val FREQUENT_COUNT = 6

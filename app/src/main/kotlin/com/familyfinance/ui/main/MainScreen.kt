@@ -59,6 +59,8 @@ import com.familyfinance.ui.common.SheetHost
 import com.familyfinance.ui.csv.CsvImportScreen
 import com.familyfinance.ui.csv.CsvImportViewModel
 import com.familyfinance.ui.more.MoreScreen
+import com.familyfinance.ui.stats.CategoryOperationsScreen
+import com.familyfinance.ui.stats.CategoryOperationsViewModel
 import com.familyfinance.ui.stats.StatsScreen
 import com.familyfinance.ui.sync.SyncScreen
 import com.familyfinance.ui.theme.FinanceColors
@@ -77,11 +79,15 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 
 private const val EDIT_ROUTE = "transaction?${EditTransactionViewModel.ARG_UID}={${EditTransactionViewModel.ARG_UID}}" +
     "&${EditTransactionViewModel.ARG_RECEIPT}={${EditTransactionViewModel.ARG_RECEIPT}}" +
-    "&${EditTransactionViewModel.ARG_ACCOUNT}={${EditTransactionViewModel.ARG_ACCOUNT}}"
+    "&${EditTransactionViewModel.ARG_ACCOUNT}={${EditTransactionViewModel.ARG_ACCOUNT}}" +
+    "&${EditTransactionViewModel.ARG_CATEGORY}={${EditTransactionViewModel.ARG_CATEGORY}}"
 private const val ACCOUNT_OPS_ROUTE = "accountOps/{${AccountOperationsViewModel.ARG_UID}}"
 
 private const val SYNC_ROUTE = "sync"
-private const val CATEGORIES_ROUTE = "categories"
+private const val CATEGORIES_ROUTE = "categories?edit={edit}"
+private const val CATEGORY_OPS_ROUTE = "categoryOps/{${CategoryOperationsViewModel.ARG_UID}}" +
+    "?${CategoryOperationsViewModel.ARG_ONLY}={${CategoryOperationsViewModel.ARG_ONLY}}" +
+    "&${CategoryOperationsViewModel.ARG_PERIOD}={${CategoryOperationsViewModel.ARG_PERIOD}}"
 private const val BANKS_ROUTE = "banks"
 private const val WEB_ROUTE = "web"
 private const val BUDGETS_ROUTE = "budgets"
@@ -138,7 +144,11 @@ fun MainScreen() {
                     )
                 }
                 composable(Tab.Calendar.route) { CalendarScreen(onOpenDay = { openTab(Tab.Transactions) }) }
-                composable(Tab.Stats.route) { StatsScreen() }
+                composable(Tab.Stats.route) {
+                    StatsScreen(onOpenCategory = { uid, only, period ->
+                        navController.navigate("categoryOps/$uid?${CategoryOperationsViewModel.ARG_ONLY}=$only&${CategoryOperationsViewModel.ARG_PERIOD}=${Uri.encode(period)}")
+                    })
+                }
                 composable(Tab.Accounts.route) {
                     // An account opens its operations; a new one opens straight in the editor.
                     AccountsScreen(onOpenAccount = { uid -> navController.navigate(if (uid == null) accountRoute(null) else "accountOps/$uid") })
@@ -167,14 +177,32 @@ fun MainScreen() {
                 composable(Tab.More.route) {
                     MoreScreen(
                         onOpenSync = { navController.navigate(SYNC_ROUTE) },
-                        onOpenCategories = { navController.navigate(CATEGORIES_ROUTE) },
+                        onOpenCategories = { navController.navigate("categories") },
                         onOpenBanks = { navController.navigate(BANKS_ROUTE) },
                         onOpenWeb = { navController.navigate(WEB_ROUTE) },
                         onOpenBudgets = { navController.navigate(BUDGETS_ROUTE) },
                         onOpenCsv = { uri -> navController.navigate("csv?${CsvImportViewModel.ARG_URI}=${Uri.encode(uri.toString())}") },
                     )
                 }
-                composable(CATEGORIES_ROUTE) { CategoriesScreen(onClose = { navController.popBackStack() }) }
+                composable(
+                    CATEGORIES_ROUTE,
+                    arguments = listOf(navArgument("edit") { type = NavType.StringType; nullable = true; defaultValue = null }),
+                ) { entry -> CategoriesScreen(onClose = { navController.popBackStack() }, editUid = entry.arguments?.getString("edit")) }
+                composable(
+                    CATEGORY_OPS_ROUTE,
+                    arguments = listOf(
+                        navArgument(CategoryOperationsViewModel.ARG_UID) { type = NavType.StringType },
+                        navArgument(CategoryOperationsViewModel.ARG_ONLY) { type = NavType.BoolType; defaultValue = false },
+                        navArgument(CategoryOperationsViewModel.ARG_PERIOD) { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) {
+                    CategoryOperationsScreen(
+                        onClose = { navController.popBackStack() },
+                        onEditCategory = { navController.navigate("categories?edit=$it") },
+                        onOpenOperation = { navController.navigate(editRoute(it)) },
+                        onAddOperation = { navController.navigate("transaction?${EditTransactionViewModel.ARG_CATEGORY}=$it") },
+                    )
+                }
                 composable(BANKS_ROUTE) { BanksScreen(onClose = { navController.popBackStack() }) }
                 composable(WEB_ROUTE) { WebAccessScreen(onClose = { navController.popBackStack() }) }
                 composable(BUDGETS_ROUTE) { BudgetsScreen(onClose = { navController.popBackStack() }) }
@@ -197,6 +225,11 @@ fun MainScreen() {
                             defaultValue = null
                         },
                         navArgument(EditTransactionViewModel.ARG_ACCOUNT) {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument(EditTransactionViewModel.ARG_CATEGORY) {
                             type = NavType.StringType
                             nullable = true
                             defaultValue = null

@@ -25,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -52,8 +53,10 @@ private val TYPES = listOf(CategoryType.EXPENSE, CategoryType.INCOME)
 const val CATEGORIES_LIST_TAG = "categories-list"
 
 @Composable
-fun CategoriesScreen(onClose: () -> Unit, viewModel: CategoriesViewModel = hiltViewModel()) {
+fun CategoriesScreen(onClose: () -> Unit, editUid: String? = null, viewModel: CategoriesViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Opened from a category's screen: straight into its sheet.
+    LaunchedEffect(editUid) { editUid?.let(viewModel::openEdit) }
     var expanded by rememberSaveable { mutableStateOf(setOf<String>()) }
     var hiddenOpen by rememberSaveable { mutableStateOf(false) }
 

@@ -25,6 +25,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import androidx.compose.ui.unit.sp
 import com.familyfinance.ui.common.CategoryAvatar
+import com.familyfinance.ui.common.PeriodArg
 import com.familyfinance.domain.model.BudgetState
 import com.familyfinance.ui.budget.budgetColor
 import androidx.compose.foundation.background
@@ -89,7 +90,10 @@ private val TYPES = listOf(TransactionType.INCOME, TransactionType.EXPENSE)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
+fun StatsScreen(
+    onOpenCategory: (uid: String, only: Boolean, period: String) -> Unit = { _, _, _ -> },
+    viewModel: StatsViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val customDraft by viewModel.customDraft.collectAsStateWithLifecycle()
     BackHandler(enabled = state.parent != null, onBack = viewModel::back)
@@ -122,7 +126,15 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
                 if (parent != null) {
                     Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = viewModel::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ко всем категориям") }
-                        Text(parent.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                        Text(parent.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Surface(
+                            onClick = { onOpenCategory(parent.uid, false, PeriodArg.encode(state.period)) },
+                            shape = CircleShape,
+                            color = FinanceColors.PrimarySoft,
+                            contentColor = FinanceColors.Primary,
+                        ) {
+                            Text("Все операции", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                        }
                     }
                 }
                 if (state.rows.isEmpty()) {
@@ -148,7 +160,15 @@ fun StatsScreen(viewModel: StatsViewModel = hiltViewModel()) {
                             state.mainCurrency,
                             highlighted = i in highlighted,
                             modifier = Modifier.bringIntoViewRequester(requesters[i]),
-                            onOpen = { row.categoryUid?.let(viewModel::open) },
+                            onOpen = {
+                                val uid = row.categoryUid
+                                when {
+                                    uid == null -> Unit
+                                    row.canOpen -> viewModel.open(uid)
+                                    // Inside a category its own row is the operations without a subcategory.
+                                    else -> onOpenCategory(uid, uid == state.parent?.uid, PeriodArg.encode(state.period))
+                                }
+                            },
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -339,7 +359,7 @@ private fun StatRowItem(row: StatRow, currency: String, highlighted: Boolean, mo
     Row(
         modifier.fillMaxWidth()
             .background(tint)
-            .then(if (row.canOpen) Modifier.clickable(onClick = onOpen) else Modifier)
+            .then(if (row.categoryUid != null) Modifier.clickable(onClick = onOpen) else Modifier)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

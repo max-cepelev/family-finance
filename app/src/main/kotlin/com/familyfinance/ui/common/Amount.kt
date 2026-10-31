@@ -47,19 +47,25 @@ fun Amount(
     )
 }
 
-/** Unsigned amount in the color of the operation type. */
+/** An operation's amount: an expense in ink with "−", an income in green with "+", a transfer unsigned. */
 @Composable
 fun TypedAmount(
     minor: Long,
     currency: String,
     type: TransactionType,
     modifier: Modifier = Modifier,
-    style: TextStyle = MaterialTheme.typography.bodyLarge,
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
 ) {
+    val text = MoneyFormatter.format(minor, currency)
     Text(
-        MoneyFormatter.format(minor, currency),
+        when (type) {
+            TransactionType.EXPENSE -> "−$text"
+            TransactionType.INCOME -> "+$text"
+            TransactionType.TRANSFER -> text
+        },
         modifier = modifier,
-        color = typeColor(type),
+        color = if (type == TransactionType.INCOME) FinanceColors.Income else FinanceColors.Ink,
+        fontWeight = FontWeight.SemiBold,
         style = style.merge(TabularNumbers),
         maxLines = 1,
         softWrap = false,

@@ -106,6 +106,8 @@ class EditTransactionViewModel @Inject constructor(
     private val uid: String? = savedState.get<String>(ARG_UID)?.takeIf { it.isNotEmpty() }
 
     /** A new operation from a scanned receipt; known before anything loads, so the screen can lay out for it. */
+    /** A new operation started from an account's screen is on that account. */
+    private val presetAccount: String? = savedState.get<String>(ARG_ACCOUNT)?.takeIf { it.isNotEmpty() }
     private val scanned: ReceiptQr? = savedState.get<String>(ARG_RECEIPT)?.let(ReceiptQr::parse)?.takeIf { uid == null }
     val fromReceipt: Boolean get() = scanned != null
     private val registerKnown = MutableStateFlow(false)
@@ -189,7 +191,7 @@ class EditTransactionViewModel @Inject constructor(
             } else if (scanned != null) {
                 draftFrom(scanned)
             } else {
-                TransactionDraft(date = System.currentTimeMillis(), accountUid = transactions.lastUsedAccountUid())
+                TransactionDraft(date = System.currentTimeMillis(), accountUid = presetAccount ?: transactions.lastUsedAccountUid())
             }
             draft.value = initial
             loadFrequent(initial.type)
@@ -393,6 +395,7 @@ class EditTransactionViewModel @Inject constructor(
     companion object {
         const val ARG_UID = "uid"
         const val ARG_RECEIPT = "receipt"
+        const val ARG_ACCOUNT = "account"
         private val TIME = java.time.format.DateTimeFormatter.ofPattern("H:mm")
         private val DATE_TIME = java.time.format.DateTimeFormatter.ofPattern("d.MM.yyyy H:mm")
         private const val FREQUENT_COUNT = 6

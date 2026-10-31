@@ -3,6 +3,7 @@ package com.familyfinance.ui.categories
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.familyfinance.domain.model.Category
+import com.familyfinance.domain.model.CategoryColors
 import com.familyfinance.domain.model.CategoryType
 import com.familyfinance.domain.repository.CategoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,6 +35,10 @@ data class CategoryEditUi(
     val hasChildren: Boolean,
     val mergeTargetUid: String? = null,
     val nameError: Boolean = false,
+    /** Picked colour to save; null keeps the automatic one. Only top-level categories have one. */
+    val color: String? = null,
+    /** What the tile shows: [color], or the automatic or parent's colour. */
+    val shownColor: String = CategoryColors.PALETTE.last(),
 ) {
     val canDelete: Boolean get() = !isNew && operations == 0 && !hasChildren
     val canMerge: Boolean get() = !isNew && !hasChildren
@@ -87,10 +92,16 @@ class CategoriesViewModel @Inject constructor(
     }
 
     fun openNew(parentUid: String? = null) {
-        edit.value = CategoryEditUi(
-            isNew = true, uid = UUID.randomUUID().toString(), type = type.value, name = "", icon = null,
-            parentUid = parentUid, archived = false, operations = 0, hasChildren = false,
-        )
+        viewModelScope.launch {
+            val all = repository.observeAll().first()
+            // A new category takes a colour no other shows yet; a subcategory shows its parent's.
+            val color = if (parentUid == null) CategoryColors.nextFree(all, type.value) else null
+            edit.value = CategoryEditUi(
+                isNew = true, uid = UUID.randomUUID().toString(), type = type.value, name = "", icon = null,
+                parentUid = parentUid, archived = false, operations = 0, hasChildren = false,
+                color = color, shownColor = color ?: CategoryColors.resolve(all)[parentUid] ?: CategoryColors.PALETTE.last(),
+            )
+        }
     }
 
     fun openEdit(uid: String) {
@@ -102,12 +113,14 @@ class CategoriesViewModel @Inject constructor(
                 parentUid = category.parentUid, archived = category.archived,
                 operations = repository.observeUsage().first()[uid] ?: 0,
                 hasChildren = all.any { it.parentUid == uid && !it.deleted },
+                color = category.color, shownColor = CategoryColors.resolve(all)[uid] ?: CategoryColors.PALETTE.last(),
             )
         }
     }
 
     fun setName(value: String) = edit.update { it?.copy(name = value, nameError = false) }
     fun setIcon(value: String?) = edit.update { it?.copy(icon = value) }
+    fun setColor(value: String) = edit.update { it?.copy(color = value, shownColor = value) }
     fun setParent(uid: String?) = edit.update { it?.copy(parentUid = uid) }
     fun setMergeTarget(uid: String?) = edit.update { it?.copy(mergeTargetUid = uid) }
     fun dismiss() = edit.update { null }
@@ -124,7 +137,11 @@ class CategoriesViewModel @Inject constructor(
             val order = existing?.sortOrder ?: ((all.maxOfOrNull { it.sortOrder } ?: 0) + 1)
             repository.save(
                 (existing ?: Category(e.uid, null, "", e.type, order, updatedAt = 0, deviceId = ""))
-                    .copy(name = e.name.trim(), icon = e.icon, parentUid = if (e.hasChildren) null else e.parentUid),
+                    .copy(
+                        name = e.name.trim(), icon = e.icon, parentUid = if (e.hasChildren) null else e.parentUid,
+                        // Subcategories show their parent's colour, whatever is stored.
+                        color = if (e.parentUid == null || e.hasChildren) e.color else existing?.color,
+                    ),
             )
             edit.value = null
         }

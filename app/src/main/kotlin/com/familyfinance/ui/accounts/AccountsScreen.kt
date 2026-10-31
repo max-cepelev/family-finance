@@ -1,5 +1,15 @@
 package com.familyfinance.ui.accounts
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.ui.draw.clip
+import com.familyfinance.ui.common.RoundIconButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -60,7 +70,7 @@ fun AccountsScreen(
 
     Column(Modifier.fillMaxSize()) {
         ScreenTitle("Счета") {
-            IconButton(onClick = { onOpenAccount(null) }) { Icon(Icons.Filled.Add, contentDescription = "Добавить счёт") }
+            RoundIconButton(Icons.Filled.Add, "Добавить счёт", onClick = { onOpenAccount(null) })
         }
         if (!state.loading && state.groups.isEmpty()) {
             Text(
@@ -79,41 +89,50 @@ fun AccountsScreen(
             item(key = "summary") { Summary(state) }
             items(state.groups, key = { "g:" + it.name }) { group ->
                 val isOpen = group.name !in collapsed
-                WhiteCard(Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
                         Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable(role = Role.Button) { collapsed = if (isOpen) collapsed + group.name else collapsed - group.name }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(group.name, color = FinanceColors.Muted, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Amount(group.total, state.mainCurrency, weight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                        Text(group.name.uppercase(), color = FinanceColors.Muted, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                        ColoredAmount(MoneyFormatter.format(group.total, state.mainCurrency), FinanceColors.Muted, style = MaterialTheme.typography.labelMedium, weight = FontWeight.SemiBold)
                         Icon(
                             if (isOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                             contentDescription = if (isOpen) "Свернуть" else "Развернуть",
                             tint = FinanceColors.Muted,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
-                    if (isOpen) {
-                        HorizontalDivider(color = FinanceColors.Hairline)
+                    if (isOpen) WhiteCard(Modifier.fillMaxWidth()) {
                         val today = LocalDate.now()
-                        group.accounts.forEach { item ->
+                        group.accounts.forEachIndexed { index, item ->
+                            if (index > 0) HorizontalDivider(color = FinanceColors.Hairline, modifier = Modifier.padding(start = 62.dp))
                             Row(
                                 Modifier.fillMaxWidth().clickable { onOpenAccount(item.account.uid) }
-                                    .heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .heightIn(min = 58.dp).padding(horizontal = 14.dp, vertical = 8.dp)
                                     .alpha(if (item.account.hidden) 0.55f else 1f),
                                 verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(item.account.name, style = MaterialTheme.typography.bodyLarge)
+                                AccountTile(item.account.isCredit)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(item.account.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                                     if (item.account.hidden) Text("скрыт", style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
                                     creditNote(item, today)?.let { (text, soon) ->
-                                        Text(text, style = MaterialTheme.typography.bodySmall, color = if (soon) PaymentSoon else FinanceColors.Muted)
+                                        Text(text, style = MaterialTheme.typography.bodySmall, color = if (soon) FinanceColors.Warning else FinanceColors.Muted)
                                     }
                                 }
-                                Amount(item.balance, item.account.currencyCode)
+                                ColoredAmount(
+                                    MoneyFormatter.format(item.balance, item.account.currencyCode),
+                                    if (item.balance < 0) FinanceColors.Expense else FinanceColors.Ink,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    weight = FontWeight.SemiBold,
+                                )
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -123,9 +142,19 @@ fun AccountsScreen(
     }
 }
 
+/** A credit card in red, any other account in blue. */
+@Composable
+private fun AccountTile(credit: Boolean) {
+    Box(
+        Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(if (credit) FinanceColors.Expense else FinanceColors.Primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(if (credit) Icons.Outlined.CreditCard else Icons.Outlined.AccountBalanceWallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+    }
+}
+
 /** Days before a payment when the card's line turns orange. */
 private const val PAYMENT_SOON_DAYS = 3
-private val PaymentSoon = Color(0xFFA0620F)
 
 /**
  * "Доступно 39 184,58 ₽ · платёж 25 ноя" under a credit card; true when the payment is near and something is owed.
@@ -151,20 +180,26 @@ private fun creditNote(item: AccountWithBalance, today: LocalDate): Pair<String,
 
 @Composable
 private fun Summary(state: AccountsUiState) {
-    Surface(shape = CardShape, color = FinanceColors.Primary, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Итого", style = MaterialTheme.typography.bodySmall, color = FinanceColors.OnPrimaryMuted)
-                ColoredAmount(
-                    MoneyFormatter.format(state.total, state.mainCurrency),
-                    FinanceColors.Card,
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp),
-                    weight = FontWeight.Medium,
-                )
+    WhiteCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("ИТОГО ПО ВСЕМ СЧЕТАМ", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp, color = FinanceColors.Muted)
+            ColoredAmount(
+                MoneyFormatter.format(state.total, state.mainCurrency),
+                if (state.total < 0) FinanceColors.Expense else FinanceColors.Ink,
+                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 32.sp, letterSpacing = (-1).sp),
+                weight = FontWeight.ExtraBold,
+            )
+            val assets = state.assets.coerceAtLeast(0)
+            val debts = abs(state.liabilities)
+            if (assets + debts > 0) {
+                Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    if (assets > 0) Box(Modifier.weight(assets.toFloat()).fillMaxHeight().background(FinanceColors.Income))
+                    if (debts > 0) Box(Modifier.weight(debts.toFloat()).fillMaxHeight().background(FinanceColors.Expense))
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryValue("Активы", state.assets, state.mainCurrency, Modifier.weight(1f))
-                SummaryValue("Долги", abs(state.liabilities), state.mainCurrency, Modifier.weight(1f))
+                SummaryValue("Активы", assets, state.mainCurrency, Modifier.weight(1f))
+                SummaryValue("Долги", debts, state.mainCurrency, Modifier.weight(1f))
             }
         }
     }
@@ -172,8 +207,8 @@ private fun Summary(state: AccountsUiState) {
 
 @Composable
 private fun SummaryValue(label: String, value: Long, currency: String, modifier: Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = FinanceColors.OnPrimaryMuted)
-        ColoredAmount(MoneyFormatter.format(value, currency), FinanceColors.Card, style = MaterialTheme.typography.bodyLarge)
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
+        ColoredAmount(MoneyFormatter.format(value, currency), FinanceColors.Ink, style = MaterialTheme.typography.bodySmall, weight = FontWeight.SemiBold)
     }
 }

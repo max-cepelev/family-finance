@@ -82,12 +82,19 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.familyfinance.domain.model.Money
+import com.familyfinance.domain.model.Category
+import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.SouthWest
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.selected
 import com.familyfinance.domain.model.TransactionType
 import com.familyfinance.ui.common.CategoryAvatar
 import com.familyfinance.ui.common.ChoiceChip
 import com.familyfinance.ui.common.DateDialog
 import com.familyfinance.ui.common.Dates
 import com.familyfinance.ui.common.MoneyFormatter
+import com.familyfinance.ui.common.RoundIconButton
 import com.familyfinance.ui.common.SegmentedToggle
 import com.familyfinance.ui.common.TabularNumbers
 import com.familyfinance.ui.common.WhiteCard
@@ -103,6 +110,7 @@ private enum class Picker { DATE, ACCOUNT, TO_ACCOUNT, CATEGORY }
 
 private val TYPES = listOf(TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER)
 private val TYPE_LABELS = listOf("Доход", "Расход", "Перевод")
+private val TYPE_ICONS = listOf(Icons.Filled.SouthWest, Icons.Filled.NorthEast, Icons.Filled.SwapHoriz)
 
 /** Which amount the keypad types into. */
 private enum class KeypadTarget { AMOUNT, TO_AMOUNT }
@@ -166,8 +174,12 @@ fun EditTransactionScreen(
                 onClose = { viewModel.closeSplit(); splitOpen = false },
             )
         } else Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
+            Row(
+                Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Назад", onClose)
                 Text(
                     when {
                         fromReceipt -> "Операция из чека"
@@ -175,7 +187,7 @@ fun EditTransactionScreen(
                         else -> "Операция"
                     },
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f).padding(start = 4.dp),
                 )
                 if (!fromReceipt && state.receipt != null) {
@@ -203,13 +215,7 @@ fun EditTransactionScreen(
                     ReceiptBanner(receipt, payee = draft.note, modifier = Modifier.padding(top = 4.dp))
                 } else {
                     // A receipt fixes the type: a purchase is an expense, a refund an income.
-                    SegmentedToggle(
-                        options = TYPE_LABELS,
-                        selected = TYPES.indexOf(draft.type),
-                        onSelect = { viewModel.setType(TYPES[it]) },
-                        selectedColor = { i -> if (TYPES[i] == TransactionType.TRANSFER) FinanceColors.Primary else typeColor(TYPES[i]) },
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                    TypePills(draft.type, onSelect = viewModel::setType, modifier = Modifier.padding(top = 4.dp))
                 }
 
                 AmountDisplay(
@@ -237,14 +243,14 @@ fun EditTransactionScreen(
                     CompactRow(
                         label = "Дата",
                         value = if (receipt != null && fromReceipt) "${Dates.relative(draft.date)}, ${receipt.time}" else Dates.relative(draft.date),
-                        leading = { RowIcon(Icons.Outlined.CalendarMonth) },
+                        leading = { RowIcon(Icons.Outlined.CalendarMonth, FinanceColors.Muted) },
                         onClick = { picker = Picker.DATE },
                     )
                     HorizontalDivider(color = FinanceColors.Hairline)
                     CompactRow(
                         label = if (isTransfer) "Со счёта" else "Счёт",
                         value = state.accountName.ifEmpty { "Выберите счёт" },
-                        leading = { RowIcon(Icons.Outlined.AccountBalanceWallet) },
+                        leading = { RowIcon(Icons.Outlined.AccountBalanceWallet, FinanceColors.Primary) },
                         trailing = state.accountBalance?.let { MoneyFormatter.format(it, state.accountCurrency) },
                         isError = DraftError.ACCOUNT in state.errors,
                         onClick = { picker = Picker.ACCOUNT },
@@ -259,7 +265,7 @@ fun EditTransactionScreen(
                         CompactRow(
                             label = "На счёт",
                             value = state.toAccountName.ifEmpty { "Выберите счёт" },
-                            leading = { RowIcon(Icons.Outlined.SwapHoriz) },
+                            leading = { RowIcon(Icons.Outlined.SwapHoriz, FinanceColors.Primary) },
                             isError = DraftError.TO_ACCOUNT in state.errors,
                             onClick = { picker = Picker.TO_ACCOUNT },
                             action = if (showNote) null else ("Заметка" to openNote),
@@ -268,7 +274,7 @@ fun EditTransactionScreen(
                         CompactRow(
                             label = "Категории",
                             value = state.parts.joinToString(", ") { it.shortName },
-                            leading = { RowIcon(Icons.AutoMirrored.Outlined.CallSplit) },
+                            leading = { RowIcon(Icons.AutoMirrored.Outlined.CallSplit, FinanceColors.Primary) },
                             onClick = { splitOpen = true; activePart = 0 },
                             action = if (showNote || fromReceipt) null else ("Заметка" to openNote),
                         )
@@ -276,7 +282,7 @@ fun EditTransactionScreen(
                         CompactRow(
                             label = "Категория",
                             value = state.categoryName.ifEmpty { if (fromReceipt) "Выберите категорию" else "Без категории" },
-                            leading = { CategoryAvatar(state.categoryTop?.name, state.categoryTop?.uid, size = 22.dp, icon = state.categoryIcon) },
+                            leading = { CategoryAvatar(state.categoryTop?.name, state.categoryTop?.uid, size = 30.dp, icon = state.categoryIcon) },
                             onClick = { picker = Picker.CATEGORY },
                             // The shop name is the note of a receipt operation, so there is no separate note.
                             action = if (showNote || fromReceipt) null else ("Заметка" to openNote),
@@ -307,9 +313,7 @@ fun EditTransactionScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         state.frequent.forEach { category ->
-                            ChoiceChip(listOfNotNull(category.icon, category.name).joinToString(" "), selected = category.uid == draft.categoryUid) {
-                                viewModel.pickCategory(category.uid)
-                            }
+                            CategoryTileButton(category, selected = category.uid == draft.categoryUid) { viewModel.pickCategory(category.uid) }
                         }
                     }
                 }
@@ -333,9 +337,7 @@ fun EditTransactionScreen(
 
             val target = keypad
             Column(
-                Modifier.fillMaxWidth()
-                    .then(if (target != null) Modifier.background(FinanceColors.Track) else Modifier)
-                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
+                Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (target != null) {
@@ -345,19 +347,25 @@ fun EditTransactionScreen(
                         onClear = { viewModel.clearAmount(toAccount) },
                     )
                 }
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (state.isNew && !fromReceipt) {
-                        OutlinedButton(
+                        Surface(
                             onClick = viewModel::saveAndAddAnother,
-                            border = BorderStroke(1.dp, FinanceColors.Primary),
-                            modifier = Modifier.weight(1f).height(48.dp),
-                        ) { Text("Сохранить и ещё", color = FinanceColors.Primary, fontWeight = FontWeight.Medium) }
+                            shape = CircleShape,
+                            color = FinanceColors.Card,
+                            shadowElevation = 1.dp,
+                            modifier = Modifier.weight(1f).height(50.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("Сохранить и ещё", color = FinanceColors.Primary, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
                     }
                     Button(
                         onClick = viewModel::save,
                         colors = ButtonDefaults.buttonColors(containerColor = FinanceColors.Primary),
-                        modifier = Modifier.weight(1f).height(48.dp),
-                    ) { Text("Сохранить", fontWeight = FontWeight.Medium) }
+                        modifier = Modifier.weight(1f).height(50.dp),
+                    ) { Text("Сохранить", fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
@@ -460,37 +468,29 @@ private fun AmountDisplay(
         ?.let { runCatching { MoneyFormatter.format(Money.toMinor(it, 2), currency) }.getOrNull() }
     Column(
         Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = label }
-            .drawBehind {
-                val y = size.height - 1.dp.toPx()
-                drawLine(line, Offset(0f, y), Offset(size.width, y), strokeWidth = 2.dp.toPx())
-            }
-            .padding(bottom = 6.dp),
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(
-            if (isError) "$label — введите сумму" else label,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isError) FinanceColors.Expense else FinanceColors.Muted,
-        )
+        if (isError) Text("$label — введите сумму", style = MaterialTheme.typography.bodySmall, color = FinanceColors.Expense)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Expression and caret take the free width; the currency sign stays at the right edge.
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (expression.isEmpty()) "0" else Calculator.display(expression),
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (expression.isEmpty()) FinanceColors.ChipBorder else FinanceColors.Ink,
-                    style = TabularNumbers,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                // A still caret: a blinking one would be an endless animation.
-                if (active) Box(Modifier.padding(start = 2.dp).width(2.dp).height(30.dp).background(accent))
-            }
-            Text(MoneyFormatter.symbol(currency), fontSize = 24.sp, color = FinanceColors.Muted, modifier = Modifier.padding(start = 8.dp))
+            Text(
+                if (expression.isEmpty()) "0" else Calculator.display(expression),
+                fontSize = 40.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-1).sp,
+                color = if (expression.isEmpty()) FinanceColors.ChipBorder else accent,
+                style = TabularNumbers,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            // A still caret: a blinking one would be an endless animation.
+            if (active) Box(Modifier.padding(start = 2.dp).width(2.dp).height(34.dp).background(if (isError) FinanceColors.Expense else accent))
+            Text(MoneyFormatter.symbol(currency), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = FinanceColors.ChipBorder, modifier = Modifier.padding(start = 8.dp))
         }
         if (result != null) {
             Text("= $result", style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers), color = FinanceColors.Muted)
@@ -498,9 +498,53 @@ private fun AmountDisplay(
     }
 }
 
+/** Income, expense, transfer as three pills; the chosen one filled with its colour. */
 @Composable
-private fun RowIcon(icon: ImageVector) =
-    Icon(icon, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
+private fun TypePills(type: TransactionType, onSelect: (TransactionType) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TYPES.forEachIndexed { i, t ->
+            val on = t == type
+            val color = if (t == TransactionType.TRANSFER) FinanceColors.Primary else typeColor(t)
+            Surface(
+                onClick = { onSelect(t) },
+                shape = CircleShape,
+                color = if (on) color else FinanceColors.Card,
+                contentColor = if (on) Color.White else FinanceColors.Ink,
+                shadowElevation = if (on) 4.dp else 1.dp,
+                modifier = Modifier.weight(1f).height(44.dp).semantics { selected = on },
+            ) {
+                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Icon(TYPE_ICONS[i], contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(TYPE_LABELS[i], fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
+                }
+            }
+        }
+    }
+}
+
+/** A frequent category: its tile and name, ringed when chosen. */
+@Composable
+private fun CategoryTileButton(category: Category, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = FinanceColors.Card,
+        border = BorderStroke(2.dp, if (selected) FinanceColors.Primary else Color.Transparent),
+        modifier = Modifier.width(84.dp).semantics { this.selected = selected },
+    ) {
+        Column(Modifier.padding(vertical = 10.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            CategoryAvatar(category.name, category.uid, size = 36.dp, icon = category.icon)
+            Text(category.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** A field's icon in white on a small tile of [color]. */
+@Composable
+private fun RowIcon(icon: ImageVector, color: Color) =
+    Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(color), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+    }
 
 /** A field as one 48dp line: icon, value, optional trailing text or action. The label goes to accessibility only. */
 @Composable
@@ -516,21 +560,22 @@ private fun CompactRow(
     onTrailingIcon: () -> Unit = {},
 ) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        Modifier.fillMaxWidth().heightIn(min = 52.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
-            Modifier.weight(1f).heightIn(min = 48.dp)
+            Modifier.weight(1f).heightIn(min = 52.dp)
                 .clickable(onClick = onClick)
                 .semantics(mergeDescendants = true) { contentDescription = "$label: $value" }
                 .padding(start = 16.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { leading() }
+            Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) { leading() }
             Text(
                 value,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 color = if (isError) FinanceColors.Expense else FinanceColors.Ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

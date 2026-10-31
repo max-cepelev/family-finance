@@ -118,6 +118,11 @@ fun TransactionsScreen(
     val listState = rememberLazyListState()
 
     // Opened from the calendar: scroll to that day once the month is loaded.
+    // The banner arrives after the list: at the top, scroll back so it shows instead of staying above.
+    val hasBanner = state.toReview.isNotEmpty()
+    LaunchedEffect(hasBanner) {
+        if (hasBanner && focusDay == null && listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
+    }
     LaunchedEffect(focusDay, state.days) {
         val day = focusDay ?: return@LaunchedEffect
         if (state.loading || state.month.monthValue != day.monthValue || state.month.year != day.year) return@LaunchedEffect
@@ -156,9 +161,9 @@ fun TransactionsScreen(
         ) {
             Surface(
                 onClick = { scanReceipt(context, receipts) },
-                shape = RoundedCornerShape(16.dp),
-                color = FinanceColors.PrimarySoft,
-                contentColor = FinanceColors.OnPrimarySoft,
+                shape = RoundedCornerShape(22.dp),
+                color = FinanceColors.Card,
+                contentColor = FinanceColors.Primary,
                 shadowElevation = 4.dp,
             ) {
                 Row(
@@ -167,12 +172,12 @@ fun TransactionsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Icon(Icons.Outlined.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text("Чек", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+                    Text("Чек", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                 }
             }
             FloatingActionButton(
                 onClick = onAdd,
-                shape = RoundedCornerShape(20.dp),
+                shape = CircleShape,
                 containerColor = FinanceColors.Primary,
                 contentColor = FinanceColors.Card,
                 elevation = FloatingActionButtonDefaults.elevation(6.dp),
@@ -210,13 +215,14 @@ private fun MonthSummary(totals: Totals, currency: String, modifier: Modifier = 
     WhiteCard(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SummaryCell("Доходы", Modifier.weight(1f), Alignment.Start) {
-                ColoredAmount(MoneyFormatter.format(totals.income, currency), FinanceColors.Income, weight = FontWeight.Medium)
+                ColoredAmount(MoneyFormatter.format(totals.income, currency), FinanceColors.Income, style = MaterialTheme.typography.titleSmall, weight = FontWeight.Bold)
             }
             SummaryCell("Расходы", Modifier.weight(1f), Alignment.Start) {
-                ColoredAmount(MoneyFormatter.format(totals.expense, currency), FinanceColors.Expense, weight = FontWeight.Medium)
+                ColoredAmount(MoneyFormatter.format(totals.expense, currency), FinanceColors.Expense, style = MaterialTheme.typography.titleSmall, weight = FontWeight.Bold)
             }
             SummaryCell("Итого", Modifier.weight(1f), Alignment.End) {
-                Amount(totals.net, currency, weight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, explicitPlus = true)
+                val net = MoneyFormatter.format(totals.net, currency)
+                ColoredAmount(if (totals.net > 0) "+$net" else net, FinanceColors.Ink, style = MaterialTheme.typography.titleSmall, weight = FontWeight.ExtraBold)
             }
         }
     }
@@ -231,19 +237,18 @@ private fun SummaryCell(label: String, modifier: Modifier, align: Alignment.Hori
 }
 
 @Composable
-private fun DayCard(day: DayUi, currency: String, onOpen: (String) -> Unit) {
+internal fun DayCard(day: DayUi, currency: String, onOpen: (String) -> Unit) {
     WhiteCard(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("${day.date.dayOfMonth}", fontSize = 24.sp, fontWeight = FontWeight.Medium)
+            Text("${day.date.dayOfMonth}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Text(Dates.weekday(day.date), style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted, modifier = Modifier.weight(1f))
-            if (day.totals.income != 0L) ColoredAmount(MoneyFormatter.format(day.totals.income, currency), FinanceColors.Income)
-            if (day.totals.expense != 0L) ColoredAmount(MoneyFormatter.format(day.totals.expense, currency), FinanceColors.Expense)
+            if (day.totals.income != 0L) ColoredAmount(MoneyFormatter.format(day.totals.income, currency), FinanceColors.Income, weight = FontWeight.SemiBold)
+            if (day.totals.expense != 0L) ColoredAmount(MoneyFormatter.format(day.totals.expense, currency), FinanceColors.Expense, weight = FontWeight.SemiBold)
         }
-        HorizontalDivider(color = FinanceColors.Hairline)
         day.rows.forEach { row -> TransactionRow(row, onClick = { onOpen(row.uid) }) }
     }
 }
@@ -258,19 +263,19 @@ internal fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
         // A small bell on the avatar marks operations the app added from a bank notification.
         Box {
             if (row.type == TransactionType.TRANSFER) {
-                Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.SwapHoriz, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(20.dp))
                 }
             } else if (row.isSplit) {
-                Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.PrimarySoft), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(FinanceColors.PrimarySoft), contentAlignment = Alignment.Center) {
                     Icon(Icons.AutoMirrored.Outlined.CallSplit, contentDescription = "Разделена по категориям", tint = FinanceColors.OnPrimarySoft, modifier = Modifier.size(20.dp))
                 }
             } else if (row.needsCategory) {
-                Box(Modifier.size(36.dp).clip(CircleShape).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(FinanceColors.Track), contentAlignment = Alignment.Center) {
                     Text("?", color = FinanceColors.Muted, fontWeight = FontWeight.Medium)
                 }
             } else {
-                CategoryAvatar(row.avatarName, row.avatarKey, icon = row.avatarIcon)
+                CategoryAvatar(row.avatarName, row.avatarKey, size = 38.dp, icon = row.avatarIcon)
             }
             // The receipt mark wins: it says more about the operation than where it first came from.
             val mark = when {
@@ -288,7 +293,7 @@ internal fun TransactionRow(row: TransactionRowUi, onClick: () -> Unit) {
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(row.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(row.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 row.subtitle,
                 style = MaterialTheme.typography.bodySmall,

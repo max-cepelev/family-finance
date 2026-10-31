@@ -3,6 +3,7 @@ package com.familyfinance.data.sync
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.BankCard
+import com.familyfinance.domain.model.Budget
 import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.Currency
@@ -18,6 +19,7 @@ object RecordKind {
     const val TRANSACTION = "tx"
     const val CARD = "card"
     const val REGISTER = "register"
+    const val BUDGET = "budget"
 
     fun of(record: Syncable): String = when (record) {
         is Currency -> CURRENCY
@@ -27,6 +29,7 @@ object RecordKind {
         is Transaction -> TRANSACTION
         is BankCard -> CARD
         is CashRegister -> REGISTER
+        is Budget -> BUDGET
         else -> error("Unknown record type ${record::class.simpleName}")
     }
 }

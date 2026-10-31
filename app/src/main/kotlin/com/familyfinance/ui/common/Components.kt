@@ -36,11 +36,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -51,9 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.familyfinance.ui.theme.FinanceColors
 import java.time.YearMonth
-import kotlin.math.abs
 
-val CardShape = RoundedCornerShape(20.dp)
+val CardShape = RoundedCornerShape(24.dp)
 
 /** White rounded card on the ground color. */
 @Composable
@@ -70,7 +72,7 @@ fun ScreenTitle(title: String, modifier: Modifier = Modifier, actions: @Composab
         modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 4.dp).height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
         actions()
     }
 }
@@ -106,16 +108,14 @@ fun PeriodHeader(
         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp).heightIn(min = 56.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(48.dp)) {
-            if (onPrevious != null) {
-                IconButton(onClick = onPrevious) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = previousLabel) }
-            }
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            if (onPrevious != null) RoundIconButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, previousLabel, onPrevious)
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Text(
                 title,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.clip(RoundedCornerShape(12.dp))
@@ -123,11 +123,24 @@ fun PeriodHeader(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             )
         }
-        Box(Modifier.size(48.dp)) {
-            if (onNext != null) {
-                IconButton(onClick = onNext) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = nextLabel) }
-            }
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            if (onNext != null) RoundIconButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, nextLabel, onNext)
         }
+    }
+}
+
+/** White circle with an icon, 40dp drawn in a 48dp touch target. */
+@Composable
+fun RoundIconButton(icon: ImageVector, label: String, onClick: () -> Unit, size: Dp = 40.dp) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = FinanceColors.Card,
+        contentColor = FinanceColors.Ink,
+        shadowElevation = 1.dp,
+        modifier = Modifier.size(size).semantics { contentDescription = label },
+    ) {
+        Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) }
     }
 }
 
@@ -171,7 +184,7 @@ fun SegmentedToggle(
     selectedColor: (Int) -> Color = { FinanceColors.Ink },
 ) {
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(FinanceColors.Track).padding(4.dp),
+        modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(FinanceColors.Track).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         options.forEachIndexed { index, label ->
@@ -180,8 +193,8 @@ fun SegmentedToggle(
                 Modifier
                     .weight(1f)
                     .height(40.dp)
-                    .then(if (isSelected) Modifier.shadow(1.dp, RoundedCornerShape(12.dp)) else Modifier)
-                    .clip(RoundedCornerShape(12.dp))
+                    .then(if (isSelected) Modifier.shadow(1.dp, RoundedCornerShape(16.dp)) else Modifier)
+                    .clip(RoundedCornerShape(16.dp))
                     .background(if (isSelected) FinanceColors.Card else Color.Transparent)
                     .semantics { this.selected = isSelected }
                     .clickable(role = Role.Tab) { onSelect(index) },
@@ -190,7 +203,7 @@ fun SegmentedToggle(
                 Text(
                     label,
                     color = if (isSelected) selectedColor(index) else FinanceColors.Muted,
-                    fontWeight = if (isSelected) FontWeight.Medium else null,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                     style = MaterialTheme.typography.bodyMedium.merge(TabularNumbers),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -201,46 +214,36 @@ fun SegmentedToggle(
     }
 }
 
-/** Tint and ink pairs for category avatars; a category keeps its pair. */
-object CategoryPalette {
-    private val pairs = listOf(
-        Color(0xFFDCEBE2) to Color(0xFF1F4D38),
-        Color(0xFFF6E1EA) to Color(0xFF8A2E55),
-        Color(0xFFDDE7F6) to Color(0xFF1F4C8F),
-        Color(0xFFD9F0EE) to Color(0xFF1C5E58),
-        Color(0xFFF6ECD5) to Color(0xFF7A5512),
-        Color(0xFFFBE3D3) to Color(0xFF8A4316),
-        Color(0xFFE8E1F5) to Color(0xFF4F3787),
-    )
-    private val none = Color(0xFFE9ECE6) to Color(0xFF4A514B)
+/** Colour of every category by uid ([com.familyfinance.domain.model.CategoryColors]), provided at the app's root. */
+val LocalCategoryColors = staticCompositionLocalOf<Map<String, Color>> { emptyMap() }
 
-    fun of(uid: String?): Pair<Color, Color> = if (uid == null) none else pairs[abs(uid.hashCode() % pairs.size)]
+/** Parses "#22A447"; grey for anything else. */
+fun categoryColor(hex: String?): Color =
+    hex?.removePrefix("#")?.toLongOrNull(16)?.let { Color(0xFF000000 or it) } ?: CategoryColorNone
 
-    /** Donut colors by rank: the five largest categories, then grey for the rest. */
-    private val ranked = listOf(
-        Color(0xFF2E6B4F), Color(0xFFE07A3F), Color(0xFF3D6FB6), Color(0xFF7FB99A), Color(0xFFD9A441),
-    )
-    val Rest = Color(0xFFB8BDB5)
-    const val RANKED = 5
+private val CategoryColorNone = Color(0xFF848A99)
 
-    fun rank(index: Int): Color = ranked.getOrElse(index) { Rest }
-}
+/** Slice colour for "Остальное" in statistics. */
+val RestColor = Color(0xFFC3C7D1)
 
-/** Round avatar: the category's emoji, or the first letter of its name on the category's tint. */
+/**
+ * A category's tile: its emoji on a light tint of its colour, or the first letter of its name on the colour.
+ * [colorKey] is the category's uid; [color] overrides it (a colour being picked).
+ */
 @Composable
-fun CategoryAvatar(name: String?, colorKey: String?, size: Dp = 36.dp, icon: String? = null) {
-    val (tint, ink) = CategoryPalette.of(colorKey)
+fun CategoryAvatar(name: String?, colorKey: String?, size: Dp = 36.dp, icon: String? = null, color: Color? = null) {
+    val base = color ?: colorKey?.let { LocalCategoryColors.current[it] } ?: CategoryColorNone
     Box(
-        Modifier.size(size).clip(CircleShape).background(tint),
+        Modifier.size(size).clip(RoundedCornerShape(size * 0.3f)).background(if (icon != null) base.copy(alpha = 0.15f) else base),
         contentAlignment = Alignment.Center,
     ) {
         if (icon != null) {
-            Text(icon, fontSize = (size.value * 0.55f).sp)
+            Text(icon, fontSize = (size.value * 0.5f).sp)
         } else {
             Text(
                 name?.firstOrNull()?.uppercase() ?: "•",
-                color = ink,
-                fontWeight = FontWeight.Medium,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
                 fontSize = (size.value * 0.42f).sp,
             )
         }

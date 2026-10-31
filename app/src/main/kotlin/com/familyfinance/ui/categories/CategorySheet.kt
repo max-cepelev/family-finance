@@ -44,6 +44,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.familyfinance.domain.model.Category
+import com.familyfinance.ui.common.categoryColor
+import com.familyfinance.domain.model.CategoryColors
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
 import com.familyfinance.ui.common.BottomSheet
 import com.familyfinance.ui.common.CategoryAvatar
 import com.familyfinance.ui.common.ChoiceChip
@@ -74,6 +78,7 @@ fun CategorySheet(
     all: List<Category>,
     onName: (String) -> Unit,
     onIcon: (String?) -> Unit,
+    onColor: (String) -> Unit,
     onParent: (String?) -> Unit,
     onMergeTarget: (String?) -> Unit,
     onMerge: () -> Unit,
@@ -103,7 +108,7 @@ fun CategorySheet(
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 4.dp))
 
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                CategoryAvatar(edit.name.ifEmpty { "?" }, edit.parentUid ?: edit.uid, size = 56.dp, icon = edit.icon)
+                CategoryAvatar(edit.name.ifEmpty { "?" }, edit.uid, size = 56.dp, icon = edit.icon, color = categoryColor(edit.shownColor))
                 // Plain rows of seven: a FlowRow with weighted items sent the UI tests into an endless layout loop.
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     SUGGESTED.chunked(EMOJI_PER_ROW).forEach { row ->
@@ -126,6 +131,17 @@ fun CategorySheet(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChoiceChip("Своё эмодзи…", selected = false) { dialog = SheetDialog.OWN_EMOJI }
                 ChoiceChip("Без значка", selected = edit.icon == null) { onIcon(null) }
+            }
+
+            if (edit.parentUid == null || edit.hasChildren) {
+                ColorPicker(edit.shownColor, onColor)
+            } else {
+                Text(
+                    "Цвет — как у «${byUid[edit.parentUid]?.name.orEmpty()}»",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FinanceColors.Muted,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
             }
 
             WhiteCard(Modifier.fillMaxWidth()) {
@@ -240,3 +256,32 @@ private fun PickRow(label: String, value: String, onClick: () -> Unit) {
         Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(24.dp))
     }
 }
+
+/** The palette as rows of six circles; the shown colour is ringed. */
+@Composable
+private fun ColorPicker(shown: String, onColor: (String) -> Unit) {
+    WhiteCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Цвет — для плитки и статистики", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = FinanceColors.Muted)
+            CategoryColors.PALETTE.chunked(COLORS_PER_ROW).forEachIndexed { r, row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    row.forEachIndexed { i, hex ->
+                        val on = hex.equals(shown, ignoreCase = true)
+                        Box(
+                            Modifier.size(40.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, if (on) FinanceColors.Ink else Color.Transparent, CircleShape)
+                                .padding(4.dp)
+                                .clip(CircleShape)
+                                .background(categoryColor(hex))
+                                .clickable(role = Role.RadioButton) { onColor(hex) }
+                                .semantics { contentDescription = "Цвет ${r * COLORS_PER_ROW + i + 1}"; selected = on },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val COLORS_PER_ROW = 6

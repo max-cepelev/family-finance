@@ -6,6 +6,7 @@ import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.AccountWithBalance
 import com.familyfinance.domain.model.BankCard
+import com.familyfinance.domain.model.Budget
 import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.Currency
@@ -116,6 +117,14 @@ interface BankCardRepository {
     /** Stamps updatedAt/deviceId and queues the change for sync. */
     suspend fun save(card: BankCard)
     /** Soft delete, so the other phone drops the link too. */
+    suspend fun delete(uid: String)
+}
+
+interface BudgetRepository {
+    fun observeAll(): Flow<List<Budget>>
+    /** Stamps updatedAt/deviceId and queues the change for sync. */
+    suspend fun save(budget: Budget)
+    /** Soft delete, so the deletion reaches the other phone. */
     suspend fun delete(uid: String)
 }
 

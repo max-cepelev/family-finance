@@ -64,6 +64,8 @@ data class CategoryEntity(
     val deviceId: String,
     /** Emoji; added in schema version 3. */
     val icon: String? = null,
+    /** "#22A447"; added in schema version 9. */
+    val color: String? = null,
 )
 
 @Entity(
@@ -175,4 +177,16 @@ data class UsageRow(
 data class BalanceRow(
     @ColumnInfo(name = "uid") val uid: String,
     @ColumnInfo(name = "balance") val balance: Long,
+)
+
+/** A monthly limit for a category (null: all expenses). Synced. Added in schema version 9. */
+@Entity(tableName = "budgets")
+data class BudgetEntity(
+    @PrimaryKey val uid: String,
+    val categoryUid: String?,
+    val amount: Long,
+    val warn: Boolean,
+    val updatedAt: Long,
+    val deleted: Boolean,
+    val deviceId: String,
 )

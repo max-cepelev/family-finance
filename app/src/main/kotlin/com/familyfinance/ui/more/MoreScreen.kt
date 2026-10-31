@@ -1,5 +1,8 @@
 package com.familyfinance.ui.more
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Laptop
 import androidx.compose.material.icons.outlined.TableChart
+import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,6 +74,7 @@ fun MoreScreen(
     onOpenBanks: () -> Unit,
     onOpenCsv: (Uri) -> Unit,
     onOpenWeb: () -> Unit,
+    onOpenBudgets: () -> Unit,
     viewModel: ImportViewModel = hiltViewModel(),
     syncViewModel: SyncViewModel = hiltViewModel(),
 ) {
@@ -105,49 +110,29 @@ fun MoreScreen(
             Spacer(Modifier.height(8.dp))
             SectionTitle("Уведомления банков")
             WhiteCard(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.fillMaxWidth().clickable(onClick = onOpenBanks).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(Icons.Outlined.NotificationsNone, contentDescription = null, tint = FinanceColors.Muted)
-                    Column(Modifier.weight(1f)) {
-                        Text("Операции из пушей", style = MaterialTheme.typography.bodyLarge)
-                        Text("Сбер, Т-Банк, Райффайзен: карты и счета", style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
-                    }
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted)
-                }
+                DataRow(Icons.Outlined.NotificationsNone, "Операции из пушей", "Сбер, Т-Банк, Райффайзен: карты и счета", RowRed, onClick = onOpenBanks)
+            }
+            Spacer(Modifier.height(8.dp))
+            SectionTitle("Планирование")
+            WhiteCard(Modifier.fillMaxWidth()) {
+                DataRow(Icons.Outlined.TrackChanges, "Бюджеты", "Лимиты расходов на месяц", RowPurple, onClick = onOpenBudgets)
             }
             Spacer(Modifier.height(8.dp))
             SectionTitle("Справочники")
             WhiteCard(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.fillMaxWidth().clickable(onClick = onOpenCategories).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(Icons.Outlined.Category, contentDescription = null, tint = FinanceColors.Muted)
-                    Text("Категории", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted)
-                }
+                DataRow(Icons.Outlined.Category, "Категории", "Значки, цвета, объединение", RowOrange, onClick = onOpenCategories)
             }
             Spacer(Modifier.height(8.dp))
-            Text(
-                "Данные",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                color = FinanceColors.Muted,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
+            SectionTitle("Данные")
             WhiteCard(Modifier.fillMaxWidth()) {
                 // Banks and Excel label CSV differently (text/csv, text/plain, octet-stream), so every file is offered.
-                DataRow(Icons.Outlined.FileUpload, "Импорт CSV", "Выписка банка или таблица в формате приложения") { csvPicker.launch(arrayOf("*/*")) }
-                HorizontalDivider(color = FinanceColors.Hairline)
-                DataRow(Icons.Outlined.FileDownload, "Экспорт в CSV", "Операции за период — для Excel или резервной копии") { exporting = true }
-                HorizontalDivider(color = FinanceColors.Hairline)
-                DataRow(Icons.Outlined.Laptop, "Доступ с компьютера", "Бюджет в браузере по домашней Wi-Fi", onClick = onOpenWeb)
-                HorizontalDivider(color = FinanceColors.Hairline)
-                DataRow(Icons.Outlined.TableChart, "Импорт из Money Manager", "Файл бэкапа .mmbak", enabled = state != ImportState.Running) {
+                DataRow(Icons.Outlined.FileUpload, "Импорт CSV", "Выписка банка или таблица в формате приложения", FinanceColors.Primary) { csvPicker.launch(arrayOf("*/*")) }
+                RowDivider()
+                DataRow(Icons.Outlined.FileDownload, "Экспорт в CSV", "Операции за период — для Excel или резервной копии", RowIndigo) { exporting = true }
+                RowDivider()
+                DataRow(Icons.Outlined.Laptop, "Доступ с компьютера", "Бюджет в браузере по домашней Wi-Fi", RowGray, onClick = onOpenWeb)
+                RowDivider()
+                DataRow(Icons.Outlined.TableChart, "Импорт из Money Manager", "Файл бэкапа .mmbak", RowGreen, enabled = state != ImportState.Running) {
                     picker.launch(arrayOf("*/*"))
                 }
             }
@@ -241,29 +226,43 @@ private fun Line(label: String, applied: Int, received: Int) {
 }
 
 @Composable
-private fun DataRow(icon: ImageVector, title: String, note: String, enabled: Boolean = true, onClick: () -> Unit) {
+private fun DataRow(icon: ImageVector, title: String, note: String, color: Color, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).heightIn(min = 62.dp).padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = FinanceColors.Muted)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(color), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             Text(note, style = MaterialTheme.typography.bodySmall, color = FinanceColors.Muted)
         }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = FinanceColors.Muted, modifier = Modifier.size(18.dp))
     }
 }
 
 @Composable
+private fun RowDivider() = HorizontalDivider(color = FinanceColors.Hairline, modifier = Modifier.padding(start = 60.dp))
+
+/** Tile colours of the menu rows. */
+private val RowRed = Color(0xFFE0453A)
+private val RowOrange = Color(0xFFE7720D)
+private val RowIndigo = Color(0xFF5257D9)
+private val RowGray = Color(0xFF848A99)
+private val RowGreen = Color(0xFF22A447)
+private val RowPurple = Color(0xFF9450DB)
+
+@Composable
 private fun SectionTitle(text: String) {
     Text(
-        text,
-        style = MaterialTheme.typography.bodySmall,
-        fontWeight = FontWeight.Medium,
+        text.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.6.sp,
         color = FinanceColors.Muted,
-        modifier = Modifier.padding(horizontal = 4.dp),
+        modifier = Modifier.padding(horizontal = 6.dp),
     )
 }
 

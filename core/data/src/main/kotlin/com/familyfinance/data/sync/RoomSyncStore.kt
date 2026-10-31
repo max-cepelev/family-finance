@@ -9,6 +9,7 @@ import com.familyfinance.data.db.toEntity
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.BankCard
+import com.familyfinance.domain.model.Budget
 import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.Currency
@@ -83,6 +84,9 @@ class RoomSyncStore @Inject constructor(private val db: FinanceDatabase) : SyncS
         applied += apply(batch.records.filterIsInstance<CashRegister>(), RecordKind.REGISTER) { list ->
             db.cashRegisterDao().upsert(list.map { it.toEntity() })
         }
+        applied += apply(batch.records.filterIsInstance<Budget>(), RecordKind.BUDGET) { list ->
+            db.budgetDao().upsert(list.map { it.toEntity() })
+        }
         dao.setOffset(SyncOffsetEntity(batch.fileName, batch.newOffset))
 
         val previous = dao.device(batch.deviceId)
@@ -119,6 +123,7 @@ class RoomSyncStore @Inject constructor(private val db: FinanceDatabase) : SyncS
                 RecordKind.TRANSACTION -> dao.transactions(chunk).map { it.toDomain() }
                 RecordKind.CARD -> db.bankDao().cardsByUid(chunk).map { it.toDomain() }
                 RecordKind.REGISTER -> db.cashRegisterDao().byUid(chunk).map { it.toDomain() }
+                RecordKind.BUDGET -> db.budgetDao().byUid(chunk).map { it.toDomain() }
                 else -> emptyList()
             }
         }

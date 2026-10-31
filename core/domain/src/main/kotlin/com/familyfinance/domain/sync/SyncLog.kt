@@ -2,6 +2,7 @@ package com.familyfinance.domain.sync
 
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.BankCard
+import com.familyfinance.domain.model.Budget
 import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.Category
@@ -90,7 +91,7 @@ sealed interface LogEntry {
     data class CategoryRecord(
         val uid: String, val parentUid: String? = null, val name: String, val type: CategoryType,
         val sortOrder: Int, val archived: Boolean, val updatedAt: Long, val deleted: Boolean, val deviceId: String,
-        val icon: String? = null,
+        val icon: String? = null, val color: String? = null,
     ) : LogEntry
 
     @Serializable
@@ -118,6 +119,13 @@ sealed interface LogEntry {
         val updatedAt: Long, val deleted: Boolean, val deviceId: String,
     ) : LogEntry
 
+    @Serializable
+    @SerialName("budget")
+    data class BudgetRecord(
+        val uid: String, val categoryUid: String? = null, val amount: Long, val warn: Boolean = true,
+        val updatedAt: Long, val deleted: Boolean, val deviceId: String,
+    ) : LogEntry
+
     /** The domain record this entry carries, null for [Device]. */
     fun toRecord(): Syncable? = when (this) {
         is Device -> null
@@ -126,13 +134,14 @@ sealed interface LogEntry {
         is AccountRecord -> Account(
             uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId, isCredit, creditLimit, paymentDay,
         )
-        is CategoryRecord -> Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
+        is CategoryRecord -> Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon, color)
         is TransactionRecord -> Transaction(
             uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
             categoryUid, note, updatedAt, deleted, deviceId, source, receipt, splitUid, splitIndex, externalId,
         )
         is BankCardRecord -> BankCard(uid, bank, last4, accountUid, updatedAt, deleted, deviceId)
         is CashRegisterRecord -> CashRegister(uid, payee, categoryUid, updatedAt, deleted, deviceId)
+        is BudgetRecord -> Budget(uid, categoryUid, amount, warn, updatedAt, deleted, deviceId)
     }
 
     companion object {
@@ -142,7 +151,7 @@ sealed interface LogEntry {
             is Account -> with(record) {
                 AccountRecord(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId, isCredit, creditLimit, paymentDay)
             }
-            is Category -> with(record) { CategoryRecord(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon) }
+            is Category -> with(record) { CategoryRecord(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon, color) }
             is Transaction -> with(record) {
                 TransactionRecord(
                     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
@@ -151,6 +160,7 @@ sealed interface LogEntry {
             }
             is BankCard -> with(record) { BankCardRecord(uid, bank, last4, accountUid, updatedAt, deleted, deviceId) }
             is CashRegister -> with(record) { CashRegisterRecord(uid, payee, categoryUid, updatedAt, deleted, deviceId) }
+            is Budget -> with(record) { BudgetRecord(uid, categoryUid, amount, warn, updatedAt, deleted, deviceId) }
             else -> error("Unknown record type ${record::class.simpleName}")
         }
     }

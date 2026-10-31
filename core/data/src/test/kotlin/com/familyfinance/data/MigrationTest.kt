@@ -101,6 +101,25 @@ class MigrationTest {
         db.close()
     }
 
+    @Test fun `version 8 categories have no colour and there are no budgets`() = runTest {
+        helper.createDatabase(NAME, 8).apply {
+            execSQL(
+                "INSERT INTO categories (uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon) " +
+                    "VALUES ('food', NULL, 'Питание', 'EXPENSE', 1, 0, 5, 0, 'me', '🛒')",
+            )
+            close()
+        }
+        helper.runMigrationsAndValidate(NAME, 9, true).close()
+
+        val db = Room.databaseBuilder(ApplicationProvider.getApplicationContext(), FinanceDatabase::class.java, NAME)
+            .allowMainThreadQueries().build()
+        val category = db.syncDao().categories(listOf("food")).single()
+        assertEquals("🛒", category.icon)
+        assertNull(category.color)
+        assertEquals(emptyList<Any>(), db.budgetDao().byUid(listOf("any")))
+        db.close()
+    }
+
     private companion object {
         const val NAME = "migration-test"
     }

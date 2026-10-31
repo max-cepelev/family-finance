@@ -13,7 +13,11 @@ import com.familyfinance.domain.model.TransactionType
 import com.familyfinance.domain.repository.AccountRepository
 import com.familyfinance.domain.repository.CategoryRepository
 import com.familyfinance.domain.repository.TransactionRepository
-import com.familyfinance.ui.common.CategoryPalette
+import com.familyfinance.ui.common.RestColor
+import com.familyfinance.ui.common.categoryColor
+import com.familyfinance.domain.model.CategoryColors
+import com.familyfinance.domain.model.BudgetState
+import com.familyfinance.domain.repository.BudgetRepository
 import com.familyfinance.ui.common.SelectedPeriod
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
@@ -38,6 +42,8 @@ import kotlinx.coroutines.launch
 data class StatRow(
     val categoryUid: String?,
     val name: String,
+    /** The category's emoji, shown in its tile. */
+    val icon: String?,
     val amount: Long,
     /** Share of the shown total, 0..1. */
     val share: Float,
@@ -46,6 +52,8 @@ data class StatRow(
     val color: Color,
     /** Has subcategories to drill into. */
     val canOpen: Boolean,
+    /** The category's monthly budget against this month's spending; only for expenses of a month. */
+    val budget: BudgetState? = null,
 )
 
 data class DonutSlice(val fraction: Float, val color: Color)
@@ -76,6 +84,7 @@ class StatsViewModel @Inject constructor(
     private val transactions: TransactionRepository,
     private val accounts: AccountRepository,
     private val categories: CategoryRepository,
+    private val budgets: BudgetRepository,
     private val selected: SelectedPeriod,
 ) : ViewModel() {
 
@@ -107,7 +116,8 @@ class StatsViewModel @Inject constructor(
             categories.observeAll(),
             accounts.observeCurrencies(),
             combine(type, parentUid, kind) { t, p, k -> Triple(t, p, k) },
-        ) { items, categoryList, currencies, (shownType, parentId, shownKind) ->
+            budgets.observeAll(),
+        ) { items, categoryList, currencies, (shownType, parentId, shownKind), budgetList ->
             val main = MainCurrency.from(currencies)
             val byUid = categoryList.associateBy { it.uid }
             val parent = parentId?.let(byUid::get)
@@ -115,6 +125,13 @@ class StatsViewModel @Inject constructor(
             val total = shares.sumOf { it.amount }
             val max = shares.maxOfOrNull { it.amount } ?: 0L
             val withChildren = categoryList.mapNotNullTo(HashSet()) { it.parentUid }
+            val colors = CategoryColors.resolve(categoryList)
+            // Budgets are monthly limits on expenses of top-level categories.
+            val budgetOf = if (period is Period.Month && shownType == TransactionType.EXPENSE && parent == null) {
+                budgetList.filter { it.categoryUid != null }.associateBy { it.categoryUid }
+            } else {
+                emptyMap()
+            }
             val rows = shares.mapIndexed { index, share ->
                 val category = share.categoryUid?.let(byUid::get)
                 StatRow(
@@ -122,13 +139,20 @@ class StatsViewModel @Inject constructor(
                     name = when {
                         category == null -> "Без категории"
                         parent != null && category.uid == parent.uid -> "${parent.name} (без подкатегории)"
-                        else -> listOfNotNull(category.icon, category.name).joinToString(" ")
+                        else -> category.name
                     },
+                    icon = category?.icon,
                     amount = share.amount,
                     share = if (total > 0) share.amount.toFloat() / total else 0f,
                     bar = if (max > 0) share.amount.toFloat() / max else 0f,
-                    color = CategoryPalette.rank(index),
+                    // Inside a category its subcategories would all share its colour: give them the palette in turn.
+                    color = when {
+                        category == null -> RestColor
+                        parent != null -> categoryColor(CategoryColors.PALETTE[index % CategoryColors.PALETTE.size])
+                        else -> categoryColor(colors[category.uid])
+                    },
                     canOpen = parent == null && category != null && category.uid in withChildren,
+                    budget = share.categoryUid?.let(budgetOf::get)?.let { BudgetState(it, share.amount) },
                 )
             }
             StatsUiState(
@@ -228,11 +252,15 @@ class StatsViewModel @Inject constructor(
         parentUid.value = null
     }
 
-    /** The ranked categories get their own slice, the rest share one grey slice. */
+    /** The largest categories get their own slice, the rest share one grey slice. */
     private fun slices(rows: List<StatRow>): List<DonutSlice> {
-        val ranked = rows.take(CategoryPalette.RANKED).map { DonutSlice(it.share, it.color) }
-        val rest = rows.drop(CategoryPalette.RANKED).sumOf { it.share.toDouble() }.toFloat()
-        return if (rest > 0f) ranked + DonutSlice(rest, CategoryPalette.Rest) else ranked
+        val ranked = rows.take(SLICES).map { DonutSlice(it.share, it.color) }
+        val rest = rows.drop(SLICES).sumOf { it.share.toDouble() }.toFloat()
+        return if (rest > 0f) ranked + DonutSlice(rest, RestColor) else ranked
+    }
+
+    private companion object {
+        const val SLICES = 6
     }
 }
 

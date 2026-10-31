@@ -16,4 +16,9 @@ data class Category(
     override val deviceId: String,
     /** Emoji shown instead of the first letter; null for none. */
     val icon: String? = null,
+    /**
+     * "#22A447", picked by the user; null until then, and then [CategoryColors] gives one. Only top-level
+     * categories have their own; subcategories show their parent's.
+     */
+    val color: String? = null,
 ) : Syncable

@@ -3,6 +3,7 @@ package com.familyfinance.data.db
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.AccountGroup
 import com.familyfinance.domain.model.BankCard
+import com.familyfinance.domain.model.Budget
 import com.familyfinance.domain.model.CashRegister
 import com.familyfinance.domain.model.Category
 import com.familyfinance.domain.model.Currency
@@ -20,9 +21,9 @@ fun AccountEntity.toDomain() =
     Account(uid, groupUid, name, currencyCode, sortOrder, hidden, note, updatedAt, deleted, deviceId, isCredit, creditLimit, paymentDay)
 
 fun Category.toEntity() =
-    CategoryEntity(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
+    CategoryEntity(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon, color)
 fun CategoryEntity.toDomain() =
-    Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon)
+    Category(uid, parentUid, name, type, sortOrder, archived, updatedAt, deleted, deviceId, icon, color)
 
 fun Transaction.toEntity() = TransactionEntity(
     uid, type, date, amount, currencyCode, accountUid, accountAmount, toAccountUid, toAccountAmount,
@@ -35,6 +36,9 @@ fun TransactionEntity.toDomain() = Transaction(
 
 fun BankCard.toEntity() = BankCardEntity(uid, bank, last4, accountUid, updatedAt, deleted, deviceId)
 fun BankCardEntity.toDomain() = BankCard(uid, bank, last4, accountUid, updatedAt, deleted, deviceId)
+
+fun Budget.toEntity() = BudgetEntity(uid, categoryUid, amount, warn, updatedAt, deleted, deviceId)
+fun BudgetEntity.toDomain() = Budget(uid, categoryUid, amount, warn, updatedAt, deleted, deviceId)
 
 fun CashRegister.toEntity() = CashRegisterEntity(uid, payee, categoryUid, updatedAt, deleted, deviceId)
 fun CashRegisterEntity.toDomain() = CashRegister(uid, payee, categoryUid, updatedAt, deleted, deviceId)

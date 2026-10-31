@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -45,8 +46,9 @@ fun AmountKeypad(onKey: (Char) -> Unit, onClear: () -> Unit, modifier: Modifier 
                     Box(
                         Modifier
                             .weight(1f)
-                            .height(52.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .height(50.dp)
+                            .shadow(1.dp, RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .background(if (operator) FinanceColors.PrimarySoft else FinanceColors.Card)
                             .combinedClickable(
                                 role = Role.Button,
@@ -59,8 +61,8 @@ fun AmountKeypad(onKey: (Char) -> Unit, onClear: () -> Unit, modifier: Modifier 
                         Text(
                             if (key == Calculator.MINUS) "−" else key.toString(),
                             fontSize = 22.sp,
-                            fontWeight = if (operator) FontWeight.Medium else FontWeight.Normal,
-                            color = if (operator) FinanceColors.OnPrimarySoft else FinanceColors.Ink,
+                            fontWeight = if (operator) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (operator) FinanceColors.Primary else FinanceColors.Ink,
                         )
                     }
                 }

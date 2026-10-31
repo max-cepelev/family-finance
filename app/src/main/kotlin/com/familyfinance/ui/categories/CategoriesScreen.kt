@@ -157,6 +157,7 @@ fun CategoriesScreen(onClose: () -> Unit, viewModel: CategoriesViewModel = hiltV
             all = state.all,
             onName = viewModel::setName,
             onIcon = viewModel::setIcon,
+            onColor = viewModel::setColor,
             onParent = viewModel::setParent,
             onMergeTarget = viewModel::setMergeTarget,
             onMerge = viewModel::merge,

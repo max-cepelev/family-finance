@@ -78,6 +78,19 @@ class CsvTest {
         assertEquals(listOf(3, 4), errors.map { it.line })
     }
 
+    @Test fun `exported refunds preserve negative amounts without changing legacy spreadsheet signs`() {
+        val ops = TransactionType.entries.map { type ->
+            CsvOperation(LocalDateTime.of(2026, 10, 26, 12, 0), type, -1250, "RUB", "Карта",
+                toAccount = "Наличные".takeIf { type == TransactionType.TRANSFER }, note = "Возврат")
+        }
+        val (back, errors) = AppCsv.parse(Csv.parse(AppCsv.write(ops)))
+        assertTrue(errors.isEmpty())
+        assertEquals(ops.mapIndexed { i, op -> op.copy(line = i + 2) }, back)
+        // Legacy manually written expenses with a minus still mean ordinary expenses.
+        val legacy = listOf(AppCsv.HEADER, listOf("26.10.2026", "расход", "-12,50", "RUB", "Карта", "", "", "", ""))
+        assertEquals(1250L, AppCsv.parse(legacy).first.single().amount)
+    }
+
     @Test fun `names match exactly or by a common start`() {
         val accounts = listOf("Сбербанк", "Наличные", "Карта Райффайзен")
         assertEquals(NameMatch.Match("Наличные", true), NameMatch.find("наличные", accounts) { it })

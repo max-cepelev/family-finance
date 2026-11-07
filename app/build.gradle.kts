@@ -22,8 +22,8 @@ android {
         applicationId = "com.familyfinance"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.7.1"
+        versionCode = 12
+        versionName = "0.8.0"
     }
     signingConfigs {
         if (keystoreProps.isNotEmpty()) {
@@ -64,6 +64,8 @@ tasks.withType<Test>().configureEach {
     forkEvery = 1
     // The smoke test imports a real backup first: -Pmmbak.path=/path/to/backup.mmbak
     systemProperty("mmbak.path", findProperty("mmbak.path") ?: System.getenv("MMBAK_PATH") ?: "")
+    // Explicit opt-in for the loopback-only browser fixture; never enabled in ordinary test runs.
+    systemProperty("web.preview", findProperty("web.preview") ?: "false")
     testLogging { events("passed", "skipped", "failed") }
 }
 

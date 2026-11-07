@@ -26,6 +26,7 @@ import kotlinx.html.script
 import kotlinx.html.section
 import kotlinx.html.span
 import kotlinx.html.title
+import java.time.YearMonth
 
 /** Pages of "Доступ с компьютера", built in Kotlin; htmx swaps parts of them without reloading. */
 object WebPages {
@@ -64,47 +65,57 @@ object WebPages {
         }
     }
 
-    fun HTML.operations(month: WebMonth, query: String, device: String) = page("${month.title} — Семейный бюджет") {
+    internal fun HTML.layout(title: String, active: String, month: YearMonth, device: String, content: FlowContent.() -> Unit) = page("$title — Семейный бюджет") {
         div("app") {
             aside("sidebar") {
                 div("brand") { span("logo") {}; span { +"Семейный бюджет" } }
                 nav {
-                    a("/ops", classes = "nav active") { +"Операции" }
-                    // The other sections come in the next steps; shown so the layout is the final one.
-                    listOf("Статистика", "Счета", "Категории", "Импорт и экспорт").forEach {
-                        span("nav soon") { attributes["title"] = "Скоро"; +it }
+                    listOf("/ops" to "Операции", "/stats" to "Статистика", "/accounts" to "Счета",
+                        "/categories" to "Категории", "/files" to "Импорт и экспорт").forEach { (path, label) ->
+                        a("$path?month=$month", classes = "nav" + if (path == active) " active" else "") {
+                            if (path == active) attributes["aria-current"] = "page"
+                            +label
+                        }
                     }
                 }
                 div("device") { +"Данные на телефоне"; br(); +device }
             }
             main("content") {
-                div("toolbar") {
-                    a("/ops?month=${month.month.minusMonths(1)}", classes = "arrow") { attributes["aria-label"] = "Предыдущий месяц"; +"‹" }
-                    h1 { +month.title }
-                    a("/ops?month=${month.month.plusMonths(1)}", classes = "arrow") { attributes["aria-label"] = "Следующий месяц"; +"›" }
-                    span("spacer") {}
-                    input(type = InputType.search, name = "q", classes = "search") {
-                        attributes["aria-label"] = "Поиск"
-                        placeholder = "Поиск по заметке и категории"
-                        value = query
-                        attributes["hx-get"] = "/ops/days?month=${month.month}"
-                        attributes["hx-trigger"] = "input changed delay:300ms, search"
-                        attributes["hx-target"] = "#list"
-                        attributes["hx-select"] = "#list"
-                        attributes["hx-swap"] = "outerHTML"
-                    }
-                    button(classes = "primary small") {
-                        type = ButtonType.button
-                        attributes["hx-get"] = "/ops/edit?month=${month.month}"
-                        attributes["hx-target"] = "#panel"
-                        attributes["hx-swap"] = "outerHTML"
-                        +"+ Операция"
-                    }
-                }
-                list(month)
+                content()
             }
             closedPanel()
         }
+    }
+
+    fun HTML.operations(month: WebMonth, query: String, device: String) = layout(month.title, "/ops", month.month, device) {
+        div("toolbar") {
+            a(month.filter.url("/ops", month.month.minusMonths(1), query), classes = "arrow") { attributes["aria-label"] = "Предыдущий месяц"; +"‹" }
+            h1 { +month.title }
+            a(month.filter.url("/ops", month.month.plusMonths(1), query), classes = "arrow") { attributes["aria-label"] = "Следующий месяц"; +"›" }
+            span("spacer") {}
+            input(type = InputType.search, name = "q", classes = "search") {
+                attributes["aria-label"] = "Поиск"
+                placeholder = "Поиск по заметке и категории"
+                value = query
+                attributes["hx-get"] = month.filter.url("/ops/days", month.month)
+                attributes["hx-trigger"] = "input changed delay:300ms, search"
+                attributes["hx-target"] = "#list"
+                attributes["hx-select"] = "#list"
+                attributes["hx-swap"] = "outerHTML"
+            }
+            button(classes = "primary small") {
+                type = ButtonType.button
+                attributes["hx-get"] = "/ops/edit?month=${month.month}"
+                attributes["hx-target"] = "#panel"
+                attributes["hx-swap"] = "outerHTML"
+                +"+ Операция"
+            }
+        }
+        if (month.filter != WebFilter()) div("filter-summary") {
+            span { +month.filterLabel }
+            a("/ops?month=${month.month}", classes = "link") { +"Сбросить фильтр" }
+        }
+        list(month)
     }
 
     /** Where the edit panel opens; empty and hidden until a row or "+ Операция" is clicked. */
@@ -118,7 +129,7 @@ object WebPages {
         div {
             id = "list"
             // Reloads itself, with the search applied, after an operation is saved or deleted.
-            attributes["hx-get"] = "/ops/days?month=${month.month}"
+            attributes["hx-get"] = month.filter.url("/ops/days", month.month)
             attributes["hx-trigger"] = "ops-changed from:body"
             attributes["hx-include"] = ".search"
             attributes["hx-select"] = "#list"

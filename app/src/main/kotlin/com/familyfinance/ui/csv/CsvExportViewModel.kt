@@ -152,7 +152,7 @@ class CsvExportViewModel @Inject constructor(
         return CsvOperation(
             dateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(tx.date), zone),
             type = tx.type,
-            amount = kotlin.math.abs(tx.amount),
+            amount = tx.amount,
             currency = tx.currencyCode,
             account = accounts[tx.accountUid]?.name.orEmpty(),
             toAccount = tx.toAccountUid?.let { accounts[it]?.name },

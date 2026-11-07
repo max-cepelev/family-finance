@@ -1,7 +1,10 @@
 package com.familyfinance.web
 
+import com.familyfinance.domain.csv.AppCsv
+import com.familyfinance.domain.csv.CsvOperation
 import com.familyfinance.domain.model.Account
 import com.familyfinance.domain.model.Category
+import com.familyfinance.domain.model.CategoryType
 import com.familyfinance.domain.model.Daily
 import com.familyfinance.domain.model.MainCurrency
 import com.familyfinance.domain.model.Split
@@ -13,6 +16,8 @@ import com.familyfinance.domain.repository.TransactionRepository
 import com.familyfinance.ui.common.CategoryNames
 import com.familyfinance.ui.common.Dates
 import com.familyfinance.ui.common.MoneyFormatter
+import java.time.Instant
+import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
@@ -42,12 +47,19 @@ data class WebMonth(
     val expense: String,
     val net: String,
     val days: List<WebDay>,
+    val filter: WebFilter = WebFilter(),
+    val filterLabel: String = "",
 )
 
 /** Data for the pages, read through the same repositories as the phone screens. */
 interface WebData {
     /** Operations of [month] by day, newest first; [query] keeps rows whose category, note or account contains it, and the totals follow. */
-    suspend fun month(month: YearMonth, query: String = ""): WebMonth
+    suspend fun month(month: YearMonth, query: String = "", filter: WebFilter = WebFilter()): WebMonth
+
+    suspend fun statistics(month: YearMonth, type: TransactionType, parentUid: String?): WebStatistics
+    suspend fun accounts(): WebAccounts
+    suspend fun categories(type: CategoryType): WebCategories
+    suspend fun export(month: YearMonth, period: WebExportPeriod, accountUid: String?): WebExport
 }
 
 class RepositoryWebData @Inject constructor(
@@ -56,19 +68,54 @@ class RepositoryWebData @Inject constructor(
     private val categories: CategoryRepository,
 ) : WebData {
 
-    override suspend fun month(month: YearMonth, query: String): WebMonth {
+    override suspend fun export(month: YearMonth, period: WebExportPeriod, accountUid: String?): WebExport {
+        val zone = ZoneId.systemDefault()
+        val (from, to) = period.range(month, zone)
+        val names = CategoryNames(categories.observeAll().first())
+        val byUid = accounts.observeAccounts().first().associateBy { it.uid }
+        val items = WebFilter(account = accountUid).apply(transactions.observeBetween(from, to).first(), emptyList())
+        val text = AppCsv.write(items.sortedBy { it.date }.map { tx ->
+            val category = names.get(tx.categoryUid)
+            val top = names.top(tx.categoryUid)
+            CsvOperation(LocalDateTime.ofInstant(Instant.ofEpochMilli(tx.date), zone), tx.type, tx.amount,
+                tx.currencyCode, byUid[tx.accountUid]?.name.orEmpty(), tx.toAccountUid?.let { byUid[it]?.name },
+                top?.name, category?.takeIf { it.uid != top?.uid }?.name, tx.note)
+        })
+        return WebExport(period.fileName(month), text)
+    }
+
+    override suspend fun categories(type: CategoryType): WebCategories =
+        WebCategories.build(type, categories.observeAll().first(), categories.observeUsage().first())
+
+    override suspend fun accounts(): WebAccounts = WebAccounts.build(accounts.observeAccountsWithBalance().first(),
+        accounts.observeGroups().first(), MainCurrency.from(accounts.observeCurrencies().first()))
+
+    override suspend fun statistics(month: YearMonth, type: TransactionType, parentUid: String?): WebStatistics {
         val zone = ZoneId.systemDefault()
         val from = month.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        return WebStatistics.build(month, type, parentUid, transactions.observeBetween(from, to).first(),
+            categories.observeAll().first(), MainCurrency.from(accounts.observeCurrencies().first()))
+    }
+
+    override suspend fun month(month: YearMonth, query: String, filter: WebFilter): WebMonth {
+        val zone = ZoneId.systemDefault()
+        val from = month.atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val categoryList = categories.observeAll().first()
+        val accountList = accounts.observeAccounts().first()
         return WebMonths.build(
             month = month,
-            items = transactions.observeBetween(from, to).first(),
+            items = filter.apply(transactions.observeBetween(from, to).first(), categoryList),
             main = MainCurrency.from(accounts.observeCurrencies().first()),
-            categories = categories.observeAll().first(),
-            accounts = accounts.observeAccounts().first(),
+            categories = categoryList,
+            accounts = accountList,
             query = query,
             zone = zone,
-        )
+        ).copy(filter = filter, filterLabel = listOfNotNull(
+            filter.account?.let { uid -> accountList.firstOrNull { it.uid == uid }?.name ?: "Неизвестный счёт" },
+            filter.category?.let { uid -> CategoryNames(categoryList).label(uid) ?: if (uid.isEmpty()) "Без категории" else "Неизвестная категория" },
+        ).joinToString(" · "))
     }
 }
 

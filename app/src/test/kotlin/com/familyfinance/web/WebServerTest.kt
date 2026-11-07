@@ -32,8 +32,8 @@ class WebServerTest {
         override fun check(token: String?): Boolean = token in tokens
     }
 
-    private val data = object : WebData {
-        override suspend fun month(month: YearMonth, query: String): WebMonth {
+    private val data = object : WebData by WebTestStore().data {
+        override suspend fun month(month: YearMonth, query: String, filter: WebFilter): WebMonth {
             val rows = listOf(
                 WebRow("t-1", "🛒", "Питание › Продукты", "Лента", listOf("чек"), "Сбербанк", "1 254,30 ₽", TransactionType.EXPENSE),
                 WebRow("t-2", "☕", "Питание › Кафе", "Шоколадница", emptyList(), "Т-Банк", "68,00 ₽", TransactionType.EXPENSE),

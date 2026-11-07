@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter
 data class CsvOperation(
     val dateTime: LocalDateTime,
     val type: TransactionType,
-    /** Minor units, positive. */
+    /** Minor units; negative values reverse the operation, e.g. a refund booked as an expense. */
     val amount: Long,
     val currency: String,
     val account: String,
@@ -37,6 +37,12 @@ object AppCsv {
         TransactionType.INCOME to "доход",
         TransactionType.TRANSFER to "перевод",
     )
+    // Explicit labels distinguish exported negative operations from legacy sheets where a minus just meant expense.
+    private val REVERSED_TYPES = mapOf(
+        TransactionType.EXPENSE to "возврат расхода",
+        TransactionType.INCOME to "возврат дохода",
+        TransactionType.TRANSFER to "обратный перевод",
+    )
     private val DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
 
     fun isAppFormat(rows: List<List<String>>): Boolean =
@@ -58,7 +64,9 @@ object AppCsv {
     private fun operation(r: List<String>, line: Int): Any {
         fun cell(i: Int) = r.getOrNull(i)?.trim().orEmpty()
         val dateTime = Csv.dateTime(cell(0)) ?: return CsvLineError(line, "дата «${cell(0)}» не прочитана")
-        val type = TYPES.entries.firstOrNull { it.value == cell(1).lowercase() }?.key
+        val label = cell(1).lowercase()
+        val reversed = label in REVERSED_TYPES.values
+        val type = (if (reversed) REVERSED_TYPES else TYPES).entries.firstOrNull { it.value == label }?.key
             ?: return CsvLineError(line, "тип «${cell(1)}»: нужен расход, доход или перевод")
         val signed = Csv.amount(cell(2)) ?: return CsvLineError(line, "сумма «${cell(2)}» не прочитана")
         if (signed == 0L) return CsvLineError(line, "сумма 0")
@@ -68,8 +76,8 @@ object AppCsv {
         return CsvOperation(
             dateTime = dateTime,
             type = type,
-            // A minus in a spreadsheet usually just repeats "расход"; the type says which way the money went.
-            amount = kotlin.math.abs(signed),
+            // Normal legacy labels keep their old meaning; explicit reversal labels preserve refunds on round-trip.
+            amount = if (reversed) -kotlin.math.abs(signed) else kotlin.math.abs(signed),
             currency = cell(3).uppercase().ifEmpty { "RUB" },
             account = account,
             toAccount = toAccount.takeIf { type == TransactionType.TRANSFER },
@@ -89,7 +97,7 @@ object AppCsv {
                 Csv.line(
                     listOf(
                         DATE_TIME.format(op.dateTime),
-                        TYPES.getValue(op.type),
+                        (if (op.amount < 0) REVERSED_TYPES else TYPES).getValue(op.type),
                         BigDecimal.valueOf(op.amount, 2).toPlainString().replace('.', ','),
                         op.currency,
                         op.account,
